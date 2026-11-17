@@ -6,7 +6,7 @@ import { ProjectIcon } from "@/components/projects/project-icon";
 import { PriorityBadge } from "@/components/tasks/task-badges";
 import { Card } from "@/components/ui/card";
 import { MemberAvatar } from "@/components/ui/member-avatar";
-import { activity, currentUser, projects, workspace } from "@/data/workspace";
+import { activity, projects, workspace } from "@/data/workspace";
 import { formatDate, myTasks, projectNames } from "@/lib/workspace";
 
 function DashboardPanel({ title, link, children }: { title: string; link?: { href: string; label: string }; children: ReactNode }) {
@@ -23,7 +23,7 @@ function DashboardPanel({ title, link, children }: { title: string; link?: { hre
   );
 }
 
-export function WelcomeBanner() {
+export function WelcomeBanner({ name }: { name: string }) {
   return (
     <section aria-labelledby="welcome-heading" className="relative isolate overflow-hidden rounded-lg border border-violet-200/70 bg-[#efebfc] px-5 py-6 sm:px-7 sm:py-7">
       <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 -z-10 hidden w-[44%] bg-[radial-gradient(#ad97df_1px,transparent_1px)] [background-size:16px_16px] [mask-image:linear-gradient(to_right,transparent,black)] sm:block">
@@ -35,7 +35,7 @@ export function WelcomeBanner() {
         <CalendarDays size={15} aria-hidden="true" />
         <time dateTime={workspace.date}>{formatDate(workspace.date, { weekday: "long", month: "long", day: "numeric" })}</time>
       </p>
-      <h2 id="welcome-heading" className="text-2xl font-semibold tracking-[-0.04em] sm:text-[1.75rem]">Welcome back, {currentUser.name.split(" ")[0]}</h2>
+      <h2 id="welcome-heading" className="text-2xl font-semibold tracking-[-0.04em] sm:text-[1.75rem]">Welcome back, {name.split(/\s+/)[0]}</h2>
       <p className="mt-1.5 text-sm text-[#544b71]">Here&apos;s what&apos;s happening across your workspace.</p>
     </section>
   );

@@ -9,7 +9,7 @@ const tones = {
   amber: "bg-amber-100 text-amber-800",
 };
 
-export function MemberAvatar({ member, className }: { member: Member; className?: string }) {
+export function MemberAvatar({ member, className }: { member: Pick<Member, "name" | "initials" | "tone">; className?: string }) {
   return (
     <span role="img" aria-label={member.name} title={member.name} className={cn("inline-grid size-8 shrink-0 place-items-center rounded-full text-[10px] font-semibold", tones[member.tone], className)}>
       {member.initials}

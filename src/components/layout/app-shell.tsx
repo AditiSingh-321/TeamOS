@@ -5,7 +5,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
 import { MemberAvatar } from "@/components/ui/member-avatar";
-import { currentUser, workspace } from "@/data/workspace";
+import { workspace } from "@/data/workspace";
+import { AccountMenu } from "@/components/auth/account-menu";
+import type { AuthProfile } from "@/types/auth";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -20,7 +22,7 @@ const upcoming = [
   { label: "Settings", icon: Settings },
 ];
 
-function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+function Sidebar({ onNavigate, profile }: { onNavigate?: () => void; profile: AuthProfile }) {
   const pathname = usePathname();
 
   return (
@@ -51,9 +53,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         </ul>
       </nav>
       <div className="mt-auto flex shrink-0 items-center gap-3 border-t border-white/10 px-2 pt-5">
-        <MemberAvatar member={currentUser} className="size-9 bg-[#392a60] text-[#e5d9ff]" />
+        <MemberAvatar member={{ ...profile, tone: "violet" }} className="size-9 bg-[#392a60] text-[#e5d9ff]" />
         <div>
-          <p className="text-sm font-medium">{currentUser.name}</p>
+          <p className="text-sm font-medium">{profile.name}</p>
           <p className="text-xs text-[#b6b3cb]">{workspace.name}</p>
         </div>
       </div>
@@ -61,7 +63,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, profile }: { children: ReactNode; profile: AuthProfile }) {
   const dialog = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -77,10 +79,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh">
       <a href="#main-content" className="sr-only z-50 rounded-md bg-card p-3 focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Skip to content</a>
-      <aside className="fixed inset-y-0 left-0 hidden w-60 lg:block"><Sidebar /></aside>
+      <aside className="fixed inset-y-0 left-0 hidden w-60 lg:block"><Sidebar profile={profile} /></aside>
       <dialog ref={dialog} aria-label="Navigation menu" className="fixed inset-y-0 left-0 m-0 h-dvh max-h-dvh w-72 max-w-[90vw] bg-sidebar backdrop:bg-[#141426]/55 lg:hidden">
         <button type="button" onClick={() => dialog.current?.close()} aria-label="Close navigation" className="absolute right-3 top-6 grid size-9 place-items-center rounded-md text-white hover:bg-white/10"><X size={19} aria-hidden="true" /></button>
-        <Sidebar onNavigate={() => dialog.current?.close()} />
+        <Sidebar profile={profile} onNavigate={() => dialog.current?.close()} />
       </dialog>
       <div className="min-w-0 lg:ml-60">
         <header className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b bg-white px-4 sm:px-8">
@@ -92,7 +94,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <span role="img" aria-label="Notifications coming soon" title="Notifications coming soon" className="grid size-8 shrink-0 place-items-center text-muted-foreground sm:ml-2"><Bell size={17} aria-hidden="true" /></span>
           <span className="h-6 border-l" aria-hidden="true" />
-          <MemberAvatar member={currentUser} />
+          <AccountMenu profile={profile} />
         </header>
         <main id="main-content" tabIndex={-1} className="mx-auto max-w-[1450px] px-4 py-7 sm:px-8 sm:py-8 xl:px-10">{children}</main>
       </div>
