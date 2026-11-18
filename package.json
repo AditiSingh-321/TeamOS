@@ -11,7 +11,8 @@
     "test": "node --experimental-strip-types --import ./tests/register.mjs --test tests/*.test.mjs",
     "typecheck": "next typegen && tsc --noEmit",
     "worker:documents": "node --conditions=react-server --experimental-strip-types --import ./scripts/register.mjs --env-file=.env.local scripts/document-worker.mjs",
-    "eval:rag": "node --experimental-strip-types --import ./tests/register.mjs scripts/evaluate-rag.mjs"
+    "eval:rag": "node --experimental-strip-types --import ./tests/register.mjs scripts/evaluate-rag.mjs",
+    "worker:intelligence": "node --conditions=react-server --experimental-strip-types --import ./scripts/register.mjs --env-file=.env.local scripts/intelligence-worker.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.16",

@@ -31,6 +31,6 @@ export interface DocumentRecord {
 }
 export interface Passage { content: string; page_number: number | null; section_title: string | null }
 export interface Chunk extends Passage { chunk_index: number; content_hash: string }
-export interface Source extends Passage { id: string; document_id: string; filename: string; similarity: number }
+export interface Source extends Passage { id: string; document_id: string | null; meeting_id?: string | null; filename: string; similarity: number }
 export interface Citation extends Source { marker: number }
-export interface ChatAnswer { answer: string; citations: Citation[]; abstained: boolean }
+export interface ChatAnswer { taskReferences?: {id:string;title:string}[]; answer: string; citations: Citation[]; abstained: boolean }

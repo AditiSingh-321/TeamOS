@@ -14,20 +14,21 @@ import type { Task } from "@/types/task";
 import type { WorkspaceSummary } from "@/types/team";
 import "@xyflow/react/dist/style.css";
 
-type TaskNode = Node<{ task: Task; blocked: boolean; affected: boolean }, "task">;
+type TaskNode = Node<{ task: Task; blocked: boolean; affected: boolean; risk?: boolean }, "task">;
 
 function DependencyTaskNode({ data, selected, isConnectable }: NodeProps<TaskNode>) {
   const router = useRouter();
   return (
-    <Card className={cn("w-60 space-y-2 border-2 p-3", data.blocked && "border-amber-500 bg-amber-50", data.affected && "ring-2 ring-violet-500 ring-offset-2", selected && "outline-2 outline-primary")}>
+    <Card className={cn("w-60 space-y-2 border-2 p-3", data.blocked && "border-amber-500 bg-amber-50", data.risk && "border-rose-500 bg-rose-50", data.affected && "ring-2 ring-violet-500 ring-offset-2", selected && "outline-2 outline-primary")}>
       <Handle type="target" position={Position.Left} isConnectable={isConnectable} aria-label="Prerequisites" />
       <button type="button" onClick={(event) => {
         event.stopPropagation();
         router.push(`/dependencies?project=${data.task.project_id}&task=${data.task.id}`, { scroll: false });
       }} className="nodrag nowheel break-words rounded text-left text-sm font-semibold hover:text-primary hover:underline">{data.task.title}</button>
       <div className="flex flex-wrap gap-1.5"><TaskStatusBadge status={data.task.status} /><PriorityBadge priority={data.task.priority} /></div>
+      {data.risk && <p className="text-xs font-semibold text-rose-700">Active risk on this task</p>}
       {data.blocked && <p className="text-xs font-medium text-amber-900">Blocked by an unfinished prerequisite</p>}
-      {data.affected && <p className="text-xs font-medium text-violet-800">Downstream of delayed task</p>}
+      {data.affected && <p className="text-xs font-medium text-violet-800">Potentially affected downstream task</p>}
       <Handle type="source" position={Position.Right} isConnectable={isConnectable} aria-label="Dependent tasks" />
     </Card>
   );
@@ -35,7 +36,9 @@ function DependencyTaskNode({ data, selected, isConnectable }: NodeProps<TaskNod
 
 const nodeTypes = { task: DependencyTaskNode };
 
-export function DependencyGraph({ tasks, edges, workspace, projectId, userId }: {
+export function DependencyGraph({ tasks, edges, workspace, projectId, userId, riskSources = [], riskAffected = [] }: {
+  riskSources?: string[];
+  riskAffected?: string[];
   tasks: Task[];
   edges: DependencyEdge[];
   workspace: WorkspaceSummary;
@@ -51,9 +54,9 @@ export function DependencyGraph({ tasks, edges, workspace, projectId, userId }: 
   const order = useMemo(() => topologicalSort(tasks, edges), [tasks, edges]);
   const positions = useMemo(() => graphPositions(tasks, edges), [tasks, edges]);
   const blocked = useMemo(() => blockedTaskIds(tasks, edges), [tasks, edges]);
-  const affected = useMemo(() => delayedId ? downstreamTasks(tasks, edges, delayedId) : [], [tasks, edges, delayedId]);
+  const affected = useMemo(() => [...new Set([...riskAffected,...(delayedId ? downstreamTasks(tasks, edges, delayedId) : [])])], [tasks, edges, delayedId,riskAffected]);
   const [nodes, , onNodesChange] = useNodesState<TaskNode>(tasks.map((task) => ({
-    id: task.id, type: "task", position: positions.get(task.id)!, data: { task, blocked: blocked.has(task.id), affected: false },
+    id: task.id, type: "task", position: positions.get(task.id)!, data: { task, blocked: blocked.has(task.id), affected: false, risk: riskSources.includes(task.id) },
   })));
   const peopleTasks = new Map(tasks.map((task) => [task.id, task]));
   const editableTargets = tasks.filter((task) => canEditTask(workspace.role, userId, task));
@@ -80,7 +83,7 @@ export function DependencyGraph({ tasks, edges, workspace, projectId, userId }: 
   const flowEdges = edges.map((edge) => ({
     id: `${edge.source_id}:${edge.target_id}`, source: edge.source_id, target: edge.target_id,
     markerEnd: { type: MarkerType.ArrowClosed },
-    style: { stroke: affected.includes(edge.target_id) && (edge.source_id === delayedId || affected.includes(edge.source_id)) ? "#7c3aed" : "#94a3b8", strokeWidth: 2 },
+    style: { stroke: affected.includes(edge.target_id) && (edge.source_id === delayedId || riskSources.includes(edge.source_id) || affected.includes(edge.source_id)) ? "#7c3aed" : "#94a3b8", strokeWidth: 2 },
   }));
 
   return (
@@ -108,7 +111,7 @@ export function DependencyGraph({ tasks, edges, workspace, projectId, userId }: 
         <p role="status" className="text-sm text-emerald-800">{notice.message}</p>
       </Card>
       <div className="h-[520px] overflow-hidden rounded-lg border bg-white" aria-label="Task dependency graph">
-        <ReactFlow<TaskNode> nodes={nodes.map((node) => ({ ...node, data: { ...node.data, affected: affected.includes(node.id) } }))}
+        <ReactFlow<TaskNode> nodes={nodes.map((node) => ({ ...node, data: { ...node.data, affected: affected.includes(node.id), risk: riskSources.includes(node.id) } }))}
           edges={flowEdges} nodeTypes={nodeTypes} onNodesChange={onNodesChange}
           onNodeClick={(_, node) => openTask(node.id)}
           onConnect={(connection) => submitEdge(connection.source, connection.target)}

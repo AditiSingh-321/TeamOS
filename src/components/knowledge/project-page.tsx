@@ -30,7 +30,7 @@ export async function KnowledgePage({ mode, selected }: { mode: "documents" | "a
             <button className="w-full rounded-md border px-3 py-2 text-sm hover:bg-muted">Open project</button>
           </form>
           <Link href={`/${mode === "documents" ? "assistant" : "documents"}?project=${project.id}`} className="block text-sm text-primary hover:underline">{mode === "documents" ? "Ask about these documents →" : "Manage documents →"}</Link>
-          <p className="text-xs leading-relaxed text-muted-foreground">Search and conversations stay within this project.</p>
+          <Link href={`/approvals?project=${project.id}`} className="block text-sm text-primary hover:underline">Propose project actions →</Link><p className="text-xs leading-relaxed text-muted-foreground">Document questions stay read-only. Project changes need explicit proposals and approval.</p>
         </Card>
         {mode === "documents" ? <DocumentsPanel key={project.id} project={project} userId={profile.id} manager={active?.role === "owner" || active?.role === "admin"} /> : <AssistantPanel key={project.id} project={project} retrieval={retrievalMode()} />}
       </div>}

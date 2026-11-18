@@ -212,6 +212,105 @@ Manual hosted check after migration, credentials, and worker setup: upload `eval
 - `scripts/document-worker.mjs`: separately executed durable worker; `scripts/evaluate-rag.mjs`: isolated evaluation.
 - `supabase/migrations/20261118040000_project_knowledge.sql`: database, Storage, queue, and policies; `20261118050000_sarvam_knowledge.sql`: provider-specific vector upgrade and full-text retrieval.
 
-New runtime dependencies: `pdfjs-dist`, `js-tiktoken`, `yauzl`, `fast-xml-parser`, and the `server-only` import guard used by the separate worker. Development-only: `@types/yauzl` and `@electric-sql/pglite-pgvector`. The existing OpenAI SDK and Zod are reused. Phase 8 is not implemented.
+Phase 7 dependencies: `pdfjs-dist`, `js-tiktoken`, `yauzl`, `fast-xml-parser`, and the `server-only` import guard used by the separate worker. Development-only: `@types/yauzl` and `@electric-sql/pglite-pgvector`. The existing OpenAI SDK and Zod are reused. Phases 8–10 are documented below.
 
 [Sarvam Responses API](https://docs.sarvam.ai/api/token-factory/responses-api) | [Sarvam embedding dimensions, task prefixes, and access requirements](https://docs.sarvam.ai/api/token-factory/models/embeddinggemma-2)
+
+
+## Phase 8: risk intelligence
+
+Apply `20261118060000_risk_intelligence.sql` after the Phase 7 migrations. The new Risk Center, task risk section, dependency highlights, and dashboard Project Health reuse the existing task and dependency data. `pnpm worker:intelligence` runs the separately supervised intelligence worker using the same server-only Supabase credential and Sarvam configuration as the document worker. `--once` handles at most one available job. There are no new runtime packages.
+
+Task comment inserts are prefiltered for blocker language in PostgreSQL and TypeScript; ordinary completion/progress comments do not call AI. Blocker flags, status/priority/date changes, dependency changes, and a periodic overdue scan create durable events. The worker classifies relevant comments using structured Sarvam output, verifies source quotations, reuses `downstreamTasks`, filters completed descendants, and calculates severity with transparent points. Reports of delay days remain reports; no delivery date is invented. No task duration/slack model or separate milestone table exists, so project delivery is the only recorded milestone.
+
+Scoring: confirmed blockers/schedule issues +25, possible blockers +10, High priority +20 or Medium +10, incomplete downstream tasks +5 each (capped at 25), overdue +20 or due within seven days +10, and an overdue project deadline/downstream date after delivery +10. Critical starts at 80, High at 55, Medium at 30. Each risk stores the explanations. Model confidence is subjective, not a calibrated probability.
+
+Only owners/admins can acknowledge, resolve, dismiss, or request reanalysis. Task creators, assignees, and managers may flag a task blocked. Active task/type fingerprints deduplicate repeated evidence; event processing is leased and idempotent. Status history and linked evidence are retained. A changed project snapshot causes retry rather than publishing obsolete graph impact. Risk data is eventually consistent with the queue; viewing a page does not call the model.
+
+## Phase 9: meeting intelligence
+
+Apply `20261118070000_meeting_intelligence.sql` next, then restart `pnpm worker:intelligence`. Meetings support title/date/participants, pasted notes, and local UTF-8 TXT/Markdown import (20-16,000 characters; at most 64 KB). No audio/video recording is introduced. All workspace members may create meetings; creators or workspace managers may edit, analyze, review, and delete them.
+
+Analyze Meeting queues a persistent job. Structured suggestions contain summary, quoted decisions, action items, blockers, task-update suggestions, open questions, and follow-up recommendations. Task matches use unique exact normalized titles; ambiguous matches remain unselected. Unknown assignees and relative dates remain uncertain. Saving a review validates quoted evidence and all project/task/member references, indexes only reviewed summaries and selected decisions, and queues selected task-linked blockers through the existing Phase 8 engine. Analysis itself never changes tasks.
+
+Meeting analyses retain a source snapshot and version. Editing notes invalidates the old reviewed search content immediately. Leases and revision checks prevent old analyses/index jobs from publishing into a new revision. The existing chunking/indexing/retrieval code now supports either a document source or a reviewed meeting source with composite tenant foreign keys and RLS. Citations open the authorized original meeting. Unapproved task suggestions are excluded from the knowledge index. Deleting a meeting cascades its indexed content.
+
+Meeting endpoints are under `/api/projects/[id]/meetings`: GET/POST; `/[meetingId]`: GET/PATCH/DELETE; `/[meetingId]/analyze`: POST; `/[meetingId]/review`: POST. Each endpoint authenticates the current user and validates project membership, inputs, and origin. PostgreSQL independently enforces mutation permissions. Expensive user-requested analyses reuse the existing request budget. Worker failures retry up to three attempts and surface a retryable Failed analysis.
+
+
+## Phase 10: proposals and human approval
+
+Apply `20261118080000_action_approval_engine.sql` after the risk and meeting migrations. All AI calls remain on Sarvam; keep `SARVAM_API_KEY`, `SARVAM_MODEL`, the existing Supabase settings, and the trusted worker credential. No new packages or external action services were installed.
+
+The six-action registry is in `src/lib/intelligence/registry.ts`: CREATE_TASK, UPDATE_TASK_STATUS, UPDATE_TASK_PRIORITY, UPDATE_TASK_DUE_DATE, ASSIGN_TASK, ADD_TASK_COMMENT. It reuses existing task input validators. `src/lib/tasks/proposal-service.ts` enters the trusted atomic approval RPC. Database handlers write the existing tasks/comments tables, reuse their constraints and triggers, and use the existing `move_task` routine for status changes. SQL execution stays inside one transaction so the task change, proposal result, and audit entry cannot partially commit. No raw SQL, role changes, external HTTP tools, deployments, messages, or destructive actions are available to the model.
+
+Members can request proposals and edit their own pending/failed proposals; owners/admins can review all proposals and approve, reject, or cancel. The Approval Center shows the operation, target, observed value, proposed value, requester, source evidence, execution result, and audit history. Save edits before approval. Failed proposals require an explicit reviewed edit that refreshes observed values. Approval alone is not an execution success: the synchronous transaction commits Executed only after the operation succeeds; failures persist Failed and an error log. Approved is an intermediate transaction state rather than a durable asynchronous execution queue.
+
+The model has no database execution tools. Natural-language requests use an explicit Propose Actions workflow, a persistent request reservation, structured output, six allowed schemas, and scoped reference validation. Ambiguous references produce a clarification; task/member selectors disambiguate them. Relative deadlines are not inferred: use YYYY-MM-DD. An ordinary document question never enters this route. The specific read-only overdue-task question also has a deterministic project-scoped answer with live task links, without generating proposals or calling AI.
+
+Risk follow-ups and reviewed meeting actions can be sent directly to the same proposal engine without an extra model call. Origin keys deduplicate repeated submissions. Meeting action items support create, update existing, or ignore; existing-task updates become separate priority/date/assignee/comment proposals and reviewed status suggestions become status proposals. If a matching task title already exists, automatic task creation is refused. Review the existing task instead. Exact normalized title matching is deliberately conservative; ambiguous task matches require a human choice.
+
+Each update proposal snapshots its relevant field. Approval locks the project and proposal, checks the current actor's manager role, revalidates all referenced records and assignees, compares the relevant field, and calls a fixed task handler. A task that became Done after a To Do proposal will not be silently overwritten. Repeated approval of Executed returns the existing result; even two approval requests cannot create two tasks. Project locks also serialize duplicate title checks across different CREATE_TASK proposals. Unrelated field edits do not unnecessarily invalidate an update. Changed meeting revisions invalidate pending actions; resubmitting a current review refreshes a pending source proposal with a new review revision. Deleting a meeting cancels its unexecuted proposals while retaining source snapshots and audit evidence.
+
+Successful meeting actions queue a refresh of that meeting's knowledge source. Reviewed summary, confirmed decisions, and approved/executed task changes have separate source sections. Unapproved task suggestions are never indexed as confirmed changes. Task changes naturally create existing risk events; no AI deadline shift occurs simply because a blocker was reported.
+
+### Architecture
+
+```mermaid
+flowchart TD
+  Task[Task / comment / dependency event] --> Events[Persistent risk event and leased job]
+  Events --> Filter[Deterministic prefilter]
+  Filter --> Classify[Sarvam classification when needed]
+  Classify --> Graph[Existing DAG traversal and deterministic risk score]
+  Graph --> Risks[Risk Center and graph highlights]
+  Notes[Meeting notes] --> MeetingJob[Leased meeting analysis]
+  MeetingJob --> Draft[Structured suggestions]
+  Draft --> Review[Human-reviewed analysis]
+  Review --> Knowledge[Shared chunk index and project RAG citations]
+  Review --> Proposals[Typed action proposals]
+  Risks --> Proposals
+  Request[Explicit action request] --> Proposals
+  Proposals --> Approval[Manager review and approval]
+  Approval --> Transaction[Permission / source / stale-state checks and transaction]
+  Transaction --> Tasks[Existing tasks and comments]
+  Transaction --> Audit[Read-only execution audit]
+  Tasks --> Events
+```
+
+### New endpoints and entry points
+
+- `/api/projects/[id]/actions/requests` POST: generate proposals from an explicit request; never execute them.
+- `/api/projects/[id]/actions/proposals/[proposalId]` POST: edit, approve/execute, reject, or cancel through validated operations.
+- `/api/projects/[id]/risks/[riskId]/propose` POST: create/reuse a risk follow-up proposal.
+- `/api/projects/[id]/meetings/[meetingId]/proposals` POST: submit the current reviewed meeting suggestions.
+- Risk acknowledgement/resolution/reanalysis and task-blocker flags use authenticated Next.js server actions, consistent with existing task forms.
+- `/risks`, `/meetings`, `/meetings/[meetingId]`, `/approvals`: protected UI routes. The authentication proxy refreshes their sessions as well as the project API routes.
+
+### Background reliability and limits
+
+Run three terminals locally when using all features:
+
+```powershell
+pnpm dev
+pnpm worker:documents
+pnpm worker:intelligence
+```
+
+Each command belongs in its own terminal. In deployment, supervise the workers separately and inject credentials through the hosting environment. Both workers support `--once` for a scheduler. Normal web routes await their work or persist a job before returning; there are no unawaited serverless background mutations.
+
+Intelligence jobs use PostgreSQL row locks, lease tokens, five-minute leases, three attempts, and delayed retries. The worker scans overdue tasks in bounded batches every minute. A project analysis queue panel exposes pending/failed counts; managers can retry failures after fixing configuration or quota. Automatic model classifications/meeting analyses are capped at 60 per hour and 300 per day per project; user-requested analyses/action planning also share the existing per-user request budget. Deterministic overdue/graph refreshes and full-text indexing do not require model calls. Meeting generation may use up to 6,000 output tokens with a longer bounded timeout; other structured answers keep their previous cap.
+
+### Verify the integrated workflow
+
+1. Apply the three new migrations in filename order after the Phase 7 migrations. Start the app and workers with configured server credentials.
+2. Create two project tasks and add a prerequisite edge. Comment on the prerequisite: "Payment integration is blocked because vendor credentials are missing."
+3. Wait for the intelligence worker. Open Risk Center, inspect the evidence/point explanations, and open Dependencies to inspect highlighted source/downstream nodes.
+4. Choose Propose follow-up, open Approval Center, review the source and values, then approve as an owner/admin. Open the resulting real task on My Tasks/Kanban and inspect its audit result. Repeat approval to verify it returns the same result.
+5. Create a meeting with notes: "We decided to use PostgreSQL. Authentication is complete. Payment integration is blocked because vendor credentials are missing. Rahul will contact the provider tomorrow."
+6. Analyze, review the cards, choose actual tasks/members, and supply an explicit date if needed. Save the reviewed analysis, then send reviewed actions to Approval Center. No task changes occur before approval.
+7. Approve a proposal. Confirm the real task change and audit evidence. In AI Assistant, ask about the reviewed decision and expand its meeting citation after indexing finishes.
+8. Make an existing task update after proposing a different value; approval should fail with a stale-state message. Check another workspace account cannot read or mutate the risks, meetings, proposals, or logs.
+
+Automated checks: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm eval:rag`, `pnpm build`. Tests mock external AI services and use actual PostgreSQL/pgvector in PGlite. The approval suite issues concurrent RPC promises and verifies one mutation/log; PGlite serializes connection queries, so a separate live two-session PostgreSQL load test is still advisable before a high-concurrency production launch. SQL project/proposal row locks provide the server-side concurrency boundary. No live AI benchmark is claimed.
+
+Known limits: indexing/risk UI is eventually consistent with the worker; risk cards show the latest 100 records and meeting/proposal lists are bounded. Natural action planning accepts up to 200 task candidates unless a task is selected explicitly. There is no duration/slack model, audio transcription, autonomous execution, or external tool integration. A verified quotation cannot prove a model's semantic interpretation, so source review remains necessary. Audit logs are protected from application edits/deletes but live within their project's retention lifecycle. Hosted migrations and the worker credential must be configured before cloud end-to-end use. Phase 11 is not implemented.

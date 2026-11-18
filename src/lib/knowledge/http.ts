@@ -28,7 +28,7 @@ export function databaseFailure(error: { code?: string } | null) {
 export function httpError(error: unknown) {
   if (error instanceof KnowledgeError) return Response.json({ error: error.message }, { status: error.status, headers: { "Cache-Control": "no-store" } });
   if (error instanceof SyntaxError) return Response.json({ error: "Invalid request body." }, { status: 400 });
-  if (error instanceof z.ZodError) return Response.json({ error: "Check the question and conversation length." }, { status: 400 });
+  if (error instanceof z.ZodError) return Response.json({ error: "Check the submitted fields and try again." }, { status: 400 });
   return Response.json({ error: "The request did not complete. Please retry." }, { status: 503 });
 }
 // Enforce limits even when Content-Length is absent or forged.

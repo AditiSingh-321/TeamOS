@@ -1,3 +1,4 @@
+import { TaskRisks } from "@/components/intelligence/task-risks";
 import { Card } from "@/components/ui/card";
 import { WorkspaceForm } from "@/components/workspaces/workspace-form";
 import { fieldClass } from "@/components/workspaces/styles";
@@ -102,6 +103,7 @@ export function TaskDetails({ workspace, members, projects, task, userId, commen
           )}
         </Card>
       )}
+      <TaskRisks taskId={task.id} editable={movable} />
       <Card className="space-y-4 p-4">
         <h3 className="font-semibold">Comments</h3>
         {commentsError ? <p role="alert" className="text-sm text-destructive">Could not load comments. Refresh to try again.</p> : (

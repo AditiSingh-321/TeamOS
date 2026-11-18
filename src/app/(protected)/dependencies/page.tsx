@@ -1,3 +1,4 @@
+import { riskSummary } from "@/lib/intelligence/queries";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DependencyGraph } from "@/components/dependencies/dependency-graph";
@@ -20,6 +21,7 @@ export default async function DependenciesPage({ searchParams }: {
   const board = active ? await getTaskBoard(active.id) : null;
   const project = board?.projects.find((entry) => entry.id === params.project);
   const graph = active && project ? await getDependencies(active.id, project.id) : null;
+  const risks = active && project ? await riskSummary(active.id,project.id) : null;
   const tasks = board?.tasks.filter((task) => task.project_id === project?.id) ?? [];
   const selected = tasks.find((task) => task.id === params.task);
   const comments = active && selected ? await getTaskComments(active.id, selected.id) : null;
@@ -52,7 +54,7 @@ export default async function DependenciesPage({ searchParams }: {
       )}
       {graphError && <p role="alert" className="text-sm text-destructive">{graphError}</p>}
       {active && project && graph && !graphError && (
-        tasks.length ? <DependencyGraph key={JSON.stringify([project.id, tasks, graph.edges])} tasks={tasks} edges={graph.edges} workspace={active} projectId={project.id} userId={profile.id} />
+        tasks.length ? <DependencyGraph key={JSON.stringify([project.id, tasks, graph.edges])} tasks={tasks} edges={graph.edges} riskSources={risks?.sources??[]} riskAffected={risks?.affected_ids??[]} workspace={active} projectId={project.id} userId={profile.id} />
           : <Card className="p-5 text-sm text-muted-foreground">No tasks in this project yet. <Link href="/my-tasks?task=new" className="rounded font-semibold text-primary hover:underline">Create a task</Link> and select this project.</Card>
       )}
       {active && board && project && selected && comments && (

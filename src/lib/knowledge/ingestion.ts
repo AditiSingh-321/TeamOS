@@ -1,5 +1,5 @@
 import { embeddingDimensions, embeddingModel, retrievalMode } from "./config";
-import type { Chunk, DocumentRecord } from "./validation";
+import type { Chunk, DocumentRecord, Passage } from "./validation";
 import { KnowledgeError } from "./validation";
 import { extractDocument } from "./extraction";
 import { chunkPassages, hashContent } from "./chunking";
@@ -15,9 +15,12 @@ export async function ingestDocument(document: Pick<DocumentRecord, "mime_type" 
   const bytes = await deps.download();
   if (bytes.length !== document.file_size) throw new KnowledgeError("Stored file size does not match the document. Delete it and upload again.");
   const passages = await extractDocument(bytes, document.mime_type);
+  return indexPassages(passages,deps,hashContent(bytes));
+}
+export async function indexPassages(passages:Passage[],deps:Omit<IngestionDependencies,"download">,fileHash:string) {
   const size = Number(process.env.RAG_CHUNK_TOKENS || 650), overlap = Number(process.env.RAG_CHUNK_OVERLAP || 100);
   const chunks = chunkPassages(passages, size, overlap);
-  if (retrievalMode() === "fulltext") return deps.finish(chunks.map((chunk) => ({ ...chunk, embedding: null, embedding_model: null })), hashContent(bytes));
+  if (retrievalMode() === "fulltext") return deps.finish(chunks.map((chunk) => ({ ...chunk, embedding: null, embedding_model: null })), fileHash);
   const cache = new Map((await deps.cached()).filter((chunk) => chunk.embedding_model === embeddingModel && chunk.embedding?.length === embeddingDimensions).map((chunk) => [chunk.content_hash, chunk.embedding!]));
   const missing = chunks.filter((chunk) => !cache.has(chunk.content_hash));
   for (let i = 0; i < missing.length; i += 32) {
@@ -27,5 +30,5 @@ export async function ingestDocument(document: Pick<DocumentRecord, "mime_type" 
     batch.forEach((chunk, index) => cache.set(chunk.content_hash, vectors[index]));
     await deps.checkpoint?.(batch.map((chunk, index) => ({ ...chunk, embedding: vectors[index], embedding_model: embeddingModel })));
   }
-  return deps.finish(chunks.map((chunk) => ({ ...chunk, embedding: cache.get(chunk.content_hash)!, embedding_model: embeddingModel })), hashContent(bytes));
+  return deps.finish(chunks.map((chunk) => ({ ...chunk, embedding: cache.get(chunk.content_hash)!, embedding_model: embeddingModel })), fileHash);
 }

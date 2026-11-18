@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ProjectHealth } from "@/components/intelligence/project-health";
 import { RecentActivity, RecentProjects, UpcomingTasks, WelcomeBanner } from "@/components/dashboard/dashboard-panels";
 import { WorkspaceStats } from "@/components/dashboard/workspace-stats";
 import { PageHeading } from "@/components/layout/page-heading";
@@ -26,6 +27,7 @@ export default async function DashboardPage() {
       )}
       {active && (
         <>
+          <ProjectHealth workspaceId={active.id} />
           <WorkspaceStats projectCount={result?.error ? null : result?.count ?? 0} tasks={taskData?.counts ?? null} />
           {result?.error && <p role="alert" className="text-sm text-destructive">Could not load workspace projects. Refresh to try again.</p>}
           <div className="grid items-start gap-5 min-[1120px]:grid-cols-[1.2fr_1fr]">

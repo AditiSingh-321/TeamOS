@@ -35,12 +35,12 @@ export async function embedTexts(texts: string[], client = knowledgeClient(), pu
 export const answerSchema = z.strictObject({
   supported: z.boolean(), claims: z.array(z.strictObject({ text: z.string().min(1).max(1500), evidence: z.array(z.strictObject({ source: z.number().int().min(1).max(8), quote: z.string().min(12).max(1000) })).min(1).max(8) })).max(8),
 });
-export async function structuredResponse<T extends z.ZodType>(schema: T, name: string, system: string, input: unknown, client = knowledgeClient()): Promise<z.infer<T>> {
+export async function structuredResponse<T extends z.ZodType>(schema: T, name: string, system: string, input: unknown, client = knowledgeClient(), maxOutputTokens = 2500): Promise<z.infer<T>> {
   try {
-    const response = await client.responses.parse({ model: knowledgeConfiguration().model, store: false, max_output_tokens: 2500,
+    const response = await client.responses.parse({ model: knowledgeConfiguration().model, store: false, max_output_tokens: Math.max(100, Math.min(6000, maxOutputTokens)),
       input: [{ role: "developer", content: system }, { role: "user", content: JSON.stringify(input) }],
       text: { format: zodTextFormat(schema, name) },
-    });
+    }, { timeout: maxOutputTokens > 2500 ? 90_000 : 45_000 });
     if (response.status !== "completed" || !response.output_parsed) throw new KnowledgeError("The assistant could not complete its answer. Try a shorter question.", 503, false);
     return schema.parse(response.output_parsed);
   } catch (error) { throw providerFailure(error); }

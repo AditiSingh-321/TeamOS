@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, ClipboardList, FileText, FolderKanban, GitBranch, Layers3, LayoutGrid, Menu, Search, Settings, Sparkles, Users, X } from "lucide-react";
+import { ClipboardCheck, CalendarDays, ShieldAlert, Bell, ClipboardList, FileText, FolderKanban, GitBranch, Layers3, LayoutGrid, Menu, Search, Settings, Sparkles, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
@@ -18,6 +18,9 @@ const navigation = [
   { href: "/my-tasks", label: "My Tasks", icon: ClipboardList },
   { href: "/assistant", label: "AI Assistant", icon: Sparkles },
   { href: "/documents", label: "Documents", icon: FileText },
+  { href: "/risks", label: "Risk Center", icon: ShieldAlert },
+  { href: "/meetings", label: "Meetings", icon: CalendarDays },
+  { href: "/approvals", label: "Approval Center", icon: ClipboardCheck },
 ];
 
 const upcoming = [
