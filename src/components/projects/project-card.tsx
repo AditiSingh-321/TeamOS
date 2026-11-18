@@ -43,6 +43,7 @@ export function ProjectCard({ project, editable }: { project: Project; editable:
           </span>
         ) : <span className="text-xs text-muted-foreground">No deadline</span>}
         <Link href={`/dependencies?project=${project.id}`} className="rounded text-sm font-semibold text-primary hover:underline">Dependencies</Link>
+        {editable && <Link href={`/projects/${project.id}/plan`} className="rounded text-sm font-semibold text-primary hover:underline">Generate with AI</Link>}
         {editable && <Link href={`/projects/${project.id}/edit`} aria-label={`Edit ${project.name}`} className="rounded text-sm font-semibold text-primary hover:underline">Edit</Link>}
       </div>
     </Card>

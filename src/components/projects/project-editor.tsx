@@ -5,7 +5,7 @@ import { deleteProject, saveProject } from "@/lib/workspaces/actions";
 import { projectStatuses } from "@/lib/workspaces/validation";
 import type { Project } from "@/types/workspace";
 
-export function ProjectEditor({ workspaceId, project }: { workspaceId: string; project?: Project }) {
+export function ProjectEditor({ workspaceId, project, taskCount = 0 }: { workspaceId: string; project?: Project; taskCount?: number }) {
   return (
     <div className="grid max-w-2xl gap-5">
       <Card className="p-5 sm:p-6">
@@ -33,9 +33,10 @@ export function ProjectEditor({ workspaceId, project }: { workspaceId: string; p
             </label>
             <label className="grid gap-1 text-sm font-medium">
               Progress (%)
-              <input type="number" name="progress" required min={0} max={100} step={1} defaultValue={project?.progress ?? 0} className={fieldClass} />
+              <input type="number" name="progress" required min={0} max={100} step={1} defaultValue={project?.progress ?? 0} readOnly={taskCount > 0} className={fieldClass} />
             </label>
           </div>
+          {taskCount > 0 && <p className="text-xs text-muted-foreground">Progress follows completed tasks in this project.</p>}
         </WorkspaceForm>
       </Card>
       {project && (
@@ -48,7 +49,8 @@ export function ProjectEditor({ workspaceId, project }: { workspaceId: string; p
               <input name="confirm" type="checkbox" required />
               Permanently delete this project
             </label>
-          </WorkspaceForm>
+            {taskCount > 0 && <p className="text-xs text-muted-foreground">Progress follows completed tasks in this project.</p>}
+        </WorkspaceForm>
         </Card>
       )}
     </div>

@@ -64,6 +64,42 @@ Amber nodes identify unfinished tasks with unfinished immediate prerequisites. S
 
 Deleting a task removes its edges. Deleting a project removes its edges and retains the existing unlinked tasks.
 
+## Phase 6 AI project planner
+
+1. Apply [the Phase 6 migration](supabase/migrations/20261118030000_ai_project_planner.sql) after the Phase 5 migration.
+2. Create a Sarvam AI API key at [the Sarvam dashboard](https://dashboard.sarvam.ai/) and check your available API credits. Put the key in `.env.local` as `SARVAM_API_KEY`. Set `SARVAM_MODEL=sarvam-105b`, or choose another Sarvam Responses API model that supports structured outputs. OpenAI keys are not used. Restart TeamOS after changing environment variables.
+3. As a workspace owner or admin, open **Projects → Generate with AI**. Enter a brief of 20–8,000 characters and optional team size, duration, deadline, technology stack, and instructions.
+4. Generate a draft, review and edit task cards, change prerequisites, or add and remove tasks. Save edits with **Save draft** and return through **Saved plans** after a refresh. Regeneration creates a new draft.
+5. Check the review checkbox, then choose **Approve & Create Tasks**. The import creates normal project tasks and dependency edges in one transaction. Repeating approval returns the existing import.
+
+The default model is configurable. The implementation calls Sarvam at `https://api.sarvam.ai/v2` using its OpenAI-compatible interface, the existing OpenAI JavaScript SDK, `responses.parse`, `zodTextFormat`, and deterministic Phase 5 graph validation. Provider refusals, incomplete responses, invalid graphs, timeouts, and API failures produce error messages.
+
+[Sarvam quickstart](https://docs.sarvam.ai/api/getting-started/quickstart) · [Sarvam Responses API](https://docs.sarvam.ai/api/token-factory/responses-api) · [Authentication](https://docs.sarvam.ai/api-reference/authentication)
+
+### Drafts and imported tasks
+
+Plans have generating, draft, approved, cancelled, or failed states. Requests are reserved before calling Sarvam, so saved requests remain visible if the browser leaves during generation. A generation that does not finish within two minutes can be cancelled and retried. The provider timeout is 75 seconds, automatic provider retries are disabled, and the planner page allows up to 120 seconds where the deployment supports that limit.
+
+Each plan contains at most 30 tasks. Duplicate IDs, duplicate titles, missing prerequisites, repeated edges, self-links, and cycles fail validation. Removing a task clears its references and reports the affected tasks.
+
+Approval checks current permissions and the draft revision, validates again in PostgreSQL, and atomically inserts tasks, dependency edges, and approval state. A failed insert rolls the entire import back. Existing tasks keep their values. Generated tasks start in To Do, are unassigned, and have no due date. Their descriptions include suggested roles, person-day effort estimates, and acceptance criteria. Planning deadlines guide the draft rather than assigning a schedule automatically.
+
+Projects with tasks derive progress from their completed-task ratio. Projects without tasks retain manual progress entry; deleting the last task resets progress to zero.
+
+### Planner security and usage
+
+- Only workspace owners and admins can read, generate, edit, cancel, or approve plans. Every action verifies authentication and project access, and PostgreSQL enforces permissions independently.
+- `SARVAM_API_KEY` is a server-only environment variable. Keep `.env.local` private and use the placeholder `.env.example` in source control.
+- The project name, description, brief, and preferences are sent to Sarvam AI during generation. Review the submitted content before using confidential project information.
+- Prompts treat project text as untrusted data. Model output is schema-checked and graph-validated before it becomes a draft. Approval creates only tasks and dependency edges.
+- The Responses API request sets `store: false`. Sarvam's data handling policies apply to submitted content.
+- A PostgreSQL reservation limits each user to one generation in progress for two minutes and three attempts per rolling ten minutes across projects. Failed and cancelled attempts count toward this limit.
+- AI effort estimates require human review. API charges depend on the model and account usage.
+
+### Planner tests
+
+`pnpm test` uses Node.js 24's test runner and a disposable PGlite PostgreSQL instance. Provider calls are mocked, so tests spend no API credits. The integration test covers brief → structured draft → edited approval → persisted task rows and dependency IDs, plus isolation, role checks, stale edits, failed imports, rate limits, cancellation, and idempotent retries.
+
 ## Pages
 
 | Route | Page |
@@ -74,10 +110,11 @@ Deleting a task removes its edges. Deleting a project removes its edges and reta
 | `/workspaces` | Create and switch workspaces, view members, and manage invitations |
 | `/projects` | Projects in the active workspace with status, progress, and deadlines |
 | `/projects/new`, `/projects/[projectId]/edit` | Create, update, or delete projects as an owner or admin |
+| `/projects/[projectId]/plan` | AI planner, saved drafts, review, and approval |
 | `/my-tasks` | Filterable Kanban board, task details drawer, and comments |
 | `/dependencies?project=<id>` | Interactive project dependency graph and delay impact |
 
-The header account menu shows the signed-in profile and provides sign-out. Project counts and recent projects come from the active workspace. Progress is entered in the project form. Task totals and upcoming assignments come from the active workspace.
+The header account menu shows the signed-in profile and provides sign-out. Project counts and recent projects come from the active workspace. Progress follows completed tasks when a project has tasks. Task totals and upcoming assignments come from the active workspace.
 
 ## Verification
 
@@ -99,6 +136,7 @@ After applying the migrations in a disposable Supabase PostgreSQL database, run 
 - `src/lib/auth`, `src/lib/supabase`, and `src/proxy.ts` handle server-side authentication and session refresh.
 - `src/lib/workspaces` contains workspace and project queries, server actions, and Zod validation.
 - `src/lib/tasks` contains task queries, server actions, validation, and permission rules.
+- `src/lib/planner` contains the planner schema, provider service, persistence, and actions.
 - `src/lib/dependencies` contains deterministic graph algorithms, queries, and server actions.
 - `tests/graph.test.mjs` exercises graph algorithms and invalid links through Node.js 24.
 - `supabase` contains database migrations and isolation tests.
