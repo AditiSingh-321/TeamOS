@@ -1,8 +1,8 @@
+import Link from "next/link";
 import { CalendarDays } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { MemberAvatar } from "@/components/ui/member-avatar";
-import { formatDate, projectProgress } from "@/lib/workspace";
+import { formatDate } from "@/lib/workspace";
 import type { Project, ProjectStatus } from "@/types/workspace";
 import { ProjectIcon } from "./project-icon";
 
@@ -13,7 +13,7 @@ export function ProjectStatusBadge({ status }: { status: ProjectStatus }) {
 }
 
 export function ProjectProgress({ project }: { project: Project }) {
-  const progress = projectProgress(project.id);
+  const progress = project.progress;
 
   return (
     <div>
@@ -25,23 +25,25 @@ export function ProjectProgress({ project }: { project: Project }) {
   );
 }
 
-export function ProjectCard({ project }: { project: Project }) {
+export function ProjectCard({ project, editable }: { project: Project; editable: boolean }) {
   return (
     <Card className="flex h-full flex-col p-5 sm:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <ProjectIcon name={project.icon} />
+        <ProjectIcon name="layers" />
         <ProjectStatusBadge status={project.status} />
       </div>
       <h2 className="text-base font-semibold tracking-tight">{project.name}</h2>
       <p className="mb-5 mt-1.5 flex-1 text-sm leading-6 text-muted-foreground">{project.description}</p>
       <ProjectProgress project={project} />
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-        <div aria-label="Project team" role="group" className="flex -space-x-2">
-          {project.members.map((member) => <MemberAvatar key={member.id} member={member} className="ring-2 ring-white" />)}
-        </div>
-        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <CalendarDays size={14} aria-hidden="true" /> <time dateTime={project.deadline}>{formatDate(project.deadline)}</time>
-        </span>
+        {project.deadline ? (
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <CalendarDays size={14} aria-hidden="true" />
+            <time dateTime={project.deadline}>{formatDate(project.deadline)}</time>
+          </span>
+        ) : <span className="text-xs text-muted-foreground">No deadline</span>}
+        <Link href={`/dependencies?project=${project.id}`} className="rounded text-sm font-semibold text-primary hover:underline">Dependencies</Link>
+        {editable && <Link href={`/projects/${project.id}/edit`} aria-label={`Edit ${project.name}`} className="rounded text-sm font-semibold text-primary hover:underline">Edit</Link>}
       </div>
     </Card>
   );

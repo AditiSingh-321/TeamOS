@@ -17,7 +17,7 @@ export const getAuthProfile = cache(async (): Promise<AuthProfile | null> => {
   const name = (typeof fullName === "string" && fullName.trim().slice(0, 100)) || email.split("@")[0] || "TeamOS member";
   const initials = name.split(/\s+/).slice(0, 2).map((word) => Array.from(word)[0]).join("").toUpperCase();
 
-  return { name, email, initials };
+  return { id: user.id, name, email, initials };
 });
 
 export async function requireAuth() {

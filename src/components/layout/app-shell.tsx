@@ -1,18 +1,20 @@
 "use client";
 
-import { Bell, ClipboardList, FileText, FolderKanban, Layers3, LayoutGrid, Menu, Search, Settings, Sparkles, X } from "lucide-react";
+import { Bell, ClipboardList, FileText, FolderKanban, GitBranch, Layers3, LayoutGrid, Menu, Search, Settings, Sparkles, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
 import { MemberAvatar } from "@/components/ui/member-avatar";
-import { workspace } from "@/data/workspace";
+import type { WorkspaceSummary } from "@/types/team";
 import { AccountMenu } from "@/components/auth/account-menu";
 import type { AuthProfile } from "@/types/auth";
 import { cn } from "@/lib/utils";
 
 const navigation = [
   { href: "/", label: "Dashboard", icon: LayoutGrid },
+  { href: "/workspaces", label: "Workspaces", icon: Users },
   { href: "/projects", label: "Projects", icon: FolderKanban },
+  { href: "/dependencies", label: "Dependencies", icon: GitBranch },
   { href: "/my-tasks", label: "My Tasks", icon: ClipboardList },
 ];
 
@@ -22,7 +24,7 @@ const upcoming = [
   { label: "Settings", icon: Settings },
 ];
 
-function Sidebar({ onNavigate, profile }: { onNavigate?: () => void; profile: AuthProfile }) {
+function Sidebar({ onNavigate, profile, workspaceName }: { onNavigate?: () => void; profile: AuthProfile; workspaceName: string }) {
   const pathname = usePathname();
 
   return (
@@ -56,15 +58,17 @@ function Sidebar({ onNavigate, profile }: { onNavigate?: () => void; profile: Au
         <MemberAvatar member={{ ...profile, tone: "violet" }} className="size-9 bg-[#392a60] text-[#e5d9ff]" />
         <div>
           <p className="text-sm font-medium">{profile.name}</p>
-          <p className="text-xs text-[#b6b3cb]">{workspace.name}</p>
+          <p className="text-xs text-[#b6b3cb]">{workspaceName}</p>
         </div>
       </div>
     </div>
   );
 }
 
-export function AppShell({ children, profile }: { children: ReactNode; profile: AuthProfile }) {
+export function AppShell({ children, profile, workspace }: { children: ReactNode; profile: AuthProfile; workspace: WorkspaceSummary | null }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const workspaceName = workspace?.name ?? "Choose workspace";
+  const initial = Array.from(workspaceName)[0].toUpperCase();
 
   useEffect(() => {
     const desktop = window.matchMedia("(min-width: 64rem)");
@@ -79,16 +83,18 @@ export function AppShell({ children, profile }: { children: ReactNode; profile: 
   return (
     <div className="min-h-dvh">
       <a href="#main-content" className="sr-only z-50 rounded-md bg-card p-3 focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Skip to content</a>
-      <aside className="fixed inset-y-0 left-0 hidden w-60 lg:block"><Sidebar profile={profile} /></aside>
+      <aside className="fixed inset-y-0 left-0 hidden w-60 lg:block"><Sidebar profile={profile} workspaceName={workspaceName} /></aside>
       <dialog ref={dialog} aria-label="Navigation menu" className="fixed inset-y-0 left-0 m-0 h-dvh max-h-dvh w-72 max-w-[90vw] bg-sidebar backdrop:bg-[#141426]/55 lg:hidden">
         <button type="button" onClick={() => dialog.current?.close()} aria-label="Close navigation" className="absolute right-3 top-6 grid size-9 place-items-center rounded-md text-white hover:bg-white/10"><X size={19} aria-hidden="true" /></button>
-        <Sidebar profile={profile} onNavigate={() => dialog.current?.close()} />
+        <Sidebar profile={profile} workspaceName={workspaceName} onNavigate={() => dialog.current?.close()} />
       </dialog>
       <div className="min-w-0 lg:ml-60">
         <header className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b bg-white px-4 sm:px-8">
           <button type="button" onClick={() => dialog.current?.showModal()} aria-label="Open navigation" className="grid size-9 place-items-center rounded-md hover:bg-muted lg:hidden"><Menu size={19} aria-hidden="true" /></button>
-          <span className="grid size-8 shrink-0 place-items-center rounded-md bg-violet-100 text-violet-800"><span className="text-xs font-semibold" aria-hidden="true">{workspace.initials}</span></span>
-          <span className="truncate text-sm font-semibold">{workspace.name}</span>
+          <Link href="/workspaces" aria-label={`Workspaces: ${workspaceName}`} className="flex min-w-0 items-center gap-2 rounded-md hover:text-primary">
+            <span className="grid size-8 shrink-0 place-items-center rounded-md bg-violet-100 text-xs font-semibold text-violet-800" aria-hidden="true">{initial}</span>
+            <span className="truncate text-sm font-semibold">{workspaceName}</span>
+          </Link>
           <div className="ml-auto flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground sm:h-auto sm:w-56 sm:justify-start sm:gap-2 sm:border sm:bg-background sm:px-3 sm:py-2 sm:text-xs">
             <Search size={15} aria-hidden="true" /><span className="sr-only sm:not-sr-only">Search workspace</span><span className="sr-only sm:not-sr-only sm:ml-auto sm:text-[10px]">Coming soon</span>
           </div>

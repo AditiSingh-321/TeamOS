@@ -1,14 +1,13 @@
 import { CheckCircle2, ClipboardList, FolderKanban, Hourglass } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { projects, tasks } from "@/data/workspace";
+import type { TaskCounts } from "@/types/task";
 
-export function WorkspaceStats() {
-  const completed = tasks.filter((task) => task.status === "Completed").length;
+export function WorkspaceStats({ projectCount, tasks }: { projectCount: number | null; tasks: TaskCounts | null }) {
   const stats = [
-    { label: "Total Projects", value: projects.length, icon: FolderKanban, tone: "bg-violet-100 text-violet-800" },
-    { label: "Total Tasks", value: tasks.length, icon: ClipboardList, tone: "bg-blue-100 text-blue-800" },
-    { label: "Completed Tasks", value: completed, icon: CheckCircle2, tone: "bg-emerald-100 text-emerald-800" },
-    { label: "Pending Tasks", value: tasks.length - completed, icon: Hourglass, tone: "bg-amber-100 text-amber-800" },
+    { label: "Total Projects", value: projectCount ?? "—", icon: FolderKanban, tone: "bg-violet-100 text-violet-800" },
+    { label: "Total Tasks", value: tasks?.total ?? "—", icon: ClipboardList, tone: "bg-blue-100 text-blue-800" },
+    { label: "Completed Tasks", value: tasks?.done ?? "—", icon: CheckCircle2, tone: "bg-emerald-100 text-emerald-800" },
+    { label: "Pending Tasks", value: tasks ? tasks.total - tasks.done : "—", icon: Hourglass, tone: "bg-amber-100 text-amber-800" },
   ];
 
   return (
