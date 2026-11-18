@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFile, readdir } from "node:fs/promises";
-import { PGlite } from "@electric-sql/pglite";
+import { readFile } from "node:fs/promises";
+import { createDatabase } from "./database.mjs";
 import { generateDraft } from "../src/lib/planner/service.ts";
 import { generatePlan } from "../src/lib/planner/sarvam.ts";
 import { validatePlan } from "../src/lib/planner/schema.ts";
@@ -9,7 +9,7 @@ import { plannedTaskInput } from "../src/lib/tasks/planned-task.ts";
 import { input, plan } from "./planner-fixtures.mjs";
 
 test("planner integration and PostgreSQL approval security", async (t) => {
-  const db = await PGlite.create();
+  const db = await createDatabase();
   const owner = "f6000000-0000-4000-8000-000000000001";
   const member = "f6000000-0000-4000-8000-000000000002";
   const outsider = "f6000000-0000-4000-8000-000000000003";
@@ -39,18 +39,6 @@ test("planner integration and PostgreSQL approval security", async (t) => {
   };
 
   try {
-    await db.exec(`
-      create role anon;
-      create role authenticated;
-      create schema auth;
-      grant usage on schema auth to anon, authenticated;
-      create table auth.users (id uuid primary key, email text, email_confirmed_at timestamptz, raw_user_meta_data jsonb);
-      create function auth.uid() returns uuid language sql stable as
-        'select (nullif(current_setting(''request.jwt.claims'', true), '''')::jsonb ->> ''sub'')::uuid';
-    `);
-    for (const file of (await readdir("supabase/migrations")).filter((name) => name.endsWith(".sql")).sort()) {
-      await db.exec(await readFile("supabase/migrations/" + file, "utf8"));
-    }
     for (const file of ["workspace_isolation.sql", "task_management.sql", "task_dependencies.sql"]) {
       await db.exec(await readFile("supabase/tests/" + file, "utf8"));
     }

@@ -11,7 +11,7 @@ pnpm install --frozen-lockfile
 if (!(Test-Path .env.local)) { Copy-Item .env.example .env.local }
 ```
 
-1. Create a Supabase project. Copy its project URL and **publishable key** from the project's Connect dialog into `.env.local`. Keep service-role and secret keys out of TeamOS.
+1. Create a Supabase project. Copy its project URL and **publishable key** from the project's Connect dialog into `.env.local`. Use the publishable key for the web app. The optional Phase 7 document worker uses a separate server-only credential described below.
 2. In Supabase **Authentication → Sign In / Providers**, enable Email sign-in, allow new users to sign up, and keep **Confirm email** enabled.
 3. In **Authentication → URL Configuration**, set **Site URL** to `http://localhost:3000`. Use this same origin in `TEAMOS_SITE_URL` and in your browser. For production, use your HTTPS app origin.
 4. In **Authentication → Email Templates → Confirm signup**, set the confirmation link to `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`. This lets TeamOS verify the link and set the session on the server.
@@ -141,3 +141,77 @@ After applying the migrations in a disposable Supabase PostgreSQL database, run 
 - `tests/graph.test.mjs` exercises graph algorithms and invalid links through Node.js 24.
 - `supabase` contains database migrations and isolation tests.
 - `src/types` contains workspace and authentication types.
+
+
+## Phase 7: project documents and grounded assistant
+
+All AI features use **Sarvam AI** through the existing OpenAI-compatible SDK pointed exclusively at Sarvam. No OpenAI API key or credits are needed. The default retrieval mode is PostgreSQL full-text search; indexing in this mode makes no AI calls. Answers and follow-up rewrites use `SARVAM_MODEL` (default `sarvam-105b`). Optional semantic retrieval uses Sarvam's `embeddinggemma-2`, which currently requires Provisioned Throughput enabled for your organisation. Full-text mode works with ordinary Sarvam chat access and does not depend on embedding provisioning.
+
+### Activate Phase 7 in Supabase
+
+1. Apply `supabase/migrations/20261118040000_project_knowledge.sql` once in the Supabase SQL Editor, after all existing migrations, then apply `supabase/migrations/20261118050000_sarvam_knowledge.sql`. If the first migration was already applied, run only the Sarvam migration. The upgrade preserves documents, files, and extracted text while clearing incompatible OpenAI vectors, changing the vector size to 768, and adding a full-text search index. The migration creates the `vector` extension in `extensions`, document/chunk tables, restricted RPCs, a private `project-documents` bucket, Storage policies, and persistent jobs. Do not make the bucket public.
+2. Copy the new settings from `.env.example` into your ignored `.env.local`. Keep existing Supabase and Sarvam settings. Keep your existing `SARVAM_API_KEY` and `SARVAM_MODEL=sarvam-105b`. Set `RAG_RETRIEVAL_MODE=fulltext`. `SARVAM_EMBEDDING_MODEL=embeddinggemma-2` is only used if you opt into semantic retrieval. Remove obsolete `OPENAI_*` settings; the application does not read them.
+3. For the separately executed trusted worker, set `SUPABASE_SERVICE_ROLE_KEY` from Supabase's project API key settings. This credential bypasses RLS and must only be available in the worker's trusted environment. Never prefix it with `NEXT_PUBLIC_`, send it to a browser, or put a real key in source control. The web routes use the signed-in user's Supabase session and do not use this key.
+4. Restart the app with `pnpm dev`. In a **second terminal** run `pnpm worker:documents`. Both processes must stay running locally. The worker requires Node.js 24. `pnpm worker:documents --once` claims at most one available job, useful with an external scheduler.
+5. In a deployment, run the worker as a separately supervised Node.js process/container with the same database and Sarvam configuration. Inject environment variables securely. The package command reads `.env.local` for local use; in a managed environment run the underlying Node command without `--env-file=.env.local` and supply the variables through your platform. A serverless web deployment alone will not process files.
+
+### Architecture and limits
+
+- Supported: selectable-text PDF (up to 100 pages), DOCX, UTF-8 TXT, and Markdown. Maximum file size is **3 MiB**. No OCR, legacy DOC, password-protected PDF, or scanned-only PDF support. Files without text fail with a useful message.
+- Each project can have at most 100 document records. Each user may reserve 10 uploads and queue 20 processing attempts per hour; durable rate records prevent deletion from resetting these limits. All workspace members may upload and ask questions. Only the uploader or an owner/admin can retry or delete a document.
+- A reservation derives the workspace from the authorized project, creates collision-resistant `workspace/project/document/source.ext` paths, and schedules delayed cleanup in case upload is abandoned. The request awaits private Storage upload and queues ingestion. The client shows actual transferred-byte progress; pending/processing status is polled every five seconds.
+- A worker claims persistent PostgreSQL jobs with `FOR UPDATE SKIP LOCKED`, a unique lease token, and a ten-minute lease. It downloads the private file, extracts text, chunks it, creates embeddings in semantic mode, checkpoints successful batches, atomically replaces the index, and marks the document Ready. No unawaited serverless background promises are used.
+- PDF.js extracts each PDF page separately. Ordered DOCX XML retains paragraphs and recognized Heading1-9 styles; TXT/Markdown preserve text and Markdown section headings. DOCX extraction does not follow links or render HTML. ZIP entry sizes, total expanded size, XML entities, file bytes, pages, extracted text length, and chunk counts are bounded. Embedded images, complex tables, footnotes, headers, and custom DOCX styles may not retain their visual layout.
+- Token-aware chunks use the `cl100k_base` tokenizer: default **650 tokens**, **100-token overlap**, with settings `RAG_CHUNK_TOKENS` (100-800) and `RAG_CHUNK_OVERLAP` (less than chunk size). Page/section boundaries are respected; short pages can produce short chunks. Duplicate chunk text is skipped. Documents exceeding 200 chunks or one million extracted characters fail and should be split.
+- In default full-text mode, chunks have no embedding: a generated PostgreSQL `tsvector` and GIN index handle retrieval. In optional semantic mode, Sarvam embeddings are `embeddinggemma-2`, **768 dimensions**, batched up to 32 inputs with documented document/query prefixes. The API does not support a `dimensions` argument, so none is sent. Indexing and queries use the same model. SHA-256 hashes and the stored model identify reusable embeddings. Enabling semantic mode requires Sarvam embedding access, setting `RAG_RETRIEVAL_MODE=semantic`, restarting both processes, and using **Re-index** on existing Ready documents. Old vectors are never truncated or mixed with Sarvam vectors.
+- Transient failures get up to three processing attempts with exponential backoff; permanent extraction/configuration errors fail promptly. Failed records can be retried manually. Leases recover worker crashes and reject stale completions. Cleanup retries continue with capped backoff. Run a supervisor with resource limits for processing untrusted documents.
+
+### Retrieval, answers, and citations
+
+The authenticated chat route verifies live project membership, validates the question and up to six recent messages, and reserves a database-enforced request budget (six questions per minute and 100 per day per user). Follow-ups are rewritten to a standalone search question. Every turn retrieves fresh project-scoped evidence. In semantic mode, it embeds the standalone question first; full-text mode has no embedding request.
+
+`search_project_documents_text` is **SECURITY INVOKER** and is the default. It builds an OR query from safely tokenized English lexemes, ranks matches with PostgreSQL full-text ranking, and enforces project/workspace scope and Ready status inside SQL and RLS. Keyword retrieval does not understand synonyms as well as semantic retrieval; include terms that appear in the source. Optional `search_project_documents` is also **SECURITY INVOKER**. It uses pgvector cosine similarity, an initial 0.25 minimum similarity, and at most eight results (`RAG_TOP_K` defaults to six). RLS and explicit SQL project/workspace predicates apply before ranking. Only Ready documents are searchable. Exact search is used inside the selected project; no approximate global index or external search service is used. This keeps isolation and recall straightforward for this bounded initial corpus. Hybrid search is not implemented.
+
+Only retrieved passages, capped at 5,000 tokens, reach the answering model. The Responses API uses structured output, `store: false`, a 2,500-output-token cap, a 45-second per-attempt timeout, and at most one SDK retry for temporary errors. Project documents, questions, and conversation history are untrusted data; they never become system instructions or executable tools. Only the relevant passages and question/history needed for the operation are sent only to Sarvam, subject to its data policies. The SDK base URL is fixed to `https://api.sarvam.ai/v2`; it never falls back to OpenAI.
+
+The model must return individual claims with numbered sources and supporting quotes. The server assigns source numbers, verifies each number against the retrieved set, checks that quoted text occurs in the passage (case/whitespace normalized), rechecks source visibility, and creates citation markers itself. Missing evidence, invalid references, invented quotes, or sources removed during generation cause an abstention. Citations include real document/chunk IDs, filename, excerpt, page number when available, and section title. Expand a source to read the excerpt; its link opens an authenticated endpoint that obtains a **60-second signed URL**. PDF links include a page fragment. Other file types download for opening with a local viewer.
+
+Chat is kept only in component memory, scoped by the selected project. **New chat**, a project switch, or refresh clears it. There is no persisted conversation table or conversation-sharing API. Responses are non-streaming so citations can be checked before display.
+
+### Deletion and security
+
+Deletion immediately marks a document Deleting and removes its searchable chunks in a database transaction. A durable cleanup job removes the private object and metadata. A failed Storage deletion stays queued; it cannot leave searchable orphan vectors. Project deletion also schedules file cleanup, even after its document rows cascade away. Signed URLs already issued may remain usable until expiry or physical deletion, whichever comes first.
+
+Composite foreign keys prevent mismatched workspace/project/document identifiers. Authenticated clients have read-only document/chunk access and restricted RPC mutations. Storage insert policies require an existing authorized reservation; overwrites and client deletes are forbidden. Worker RPCs are executable only by `service_role`. Upload and chat routes reject cross-origin mutations, bound request bodies, validate inputs, and redact unexpected provider/database failures. A selected project never causes another project's conversation or index to be searched.
+
+Prompts and citation checks reduce hallucinations and injection risk; matching a quote cannot prove that a paraphrase is semantically correct. Review source excerpts before relying on answers. This phase does not execute actions, update tasks, or introduce agents, blocker detection, OCR, or workspace-wide search.
+
+### Test Phase 7
+
+```powershell
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm eval:rag
+pnpm build
+```
+
+Tests use actual PostgreSQL/pgvector in disposable PGlite databases, mock the AI services, and model Storage authorization using its policy-protected metadata table and private in-memory bytes. They do not call hosted Supabase Storage or spend API credits. Integration coverage exercises upload reservation -> private object authorization -> extraction -> embeddings -> durable indexing -> cosine retrieval -> grounded answer/citation, tenant isolation, uploader/member permissions, retries, stale leases, deletion cleanup, and the existing planner/task/workspace regression suite. PDF and DOCX fixtures are generated reproducibly by test code.
+
+`evaluation/documents/` and `evaluation/questions.json` provide a five-question reproducible evaluation. `pnpm eval:rag` reports Hit@5, correct-source retrieval, citation validity, and abstention accuracy using **real PostgreSQL full-text retrieval and fixture answers**, without AI calls. Running with `RAG_RETRIEVAL_MODE=semantic` uses deterministic fixture embeddings with real pgvector retrieval. These metrics verify search/grounding plumbing, not live Sarvam semantic recall or answer accuracy. No live benchmark results are claimed.
+
+Manual hosted check after migration, credentials, and worker setup: upload `evaluation/documents/architecture.md`, wait for Ready, ask what authentication is used, expand its citation, and open/download the source. Ask a follow-up, switch projects to confirm a fresh chat, then delete the document and verify that it no longer supplies answers. Sign in with an account outside the workspace and confirm its document list, download URL, and search results are unavailable. Default full-text indexing is local to the database and needs no AI credits. Questions use Sarvam credits. Optional semantic indexing also uses Sarvam credits and requires embedding access.
+
+### Phase 7 source map
+
+- `src/app/(protected)/documents` and `assistant`: protected pages and loading states.
+- `src/components/knowledge`: project selection, document management, chat, and citations.
+- `src/app/api/projects/[id]/documents`: authenticated upload/list/view/download/delete/retry.
+- `src/app/api/projects/[id]/ai-chat`: validated RAG question endpoint.
+- `src/lib/knowledge`: validation, extraction, token-aware chunking, ingestion, provider adapter, prompts, and deterministic citation checking.
+- `scripts/document-worker.mjs`: separately executed durable worker; `scripts/evaluate-rag.mjs`: isolated evaluation.
+- `supabase/migrations/20261118040000_project_knowledge.sql`: database, Storage, queue, and policies; `20261118050000_sarvam_knowledge.sql`: provider-specific vector upgrade and full-text retrieval.
+
+New runtime dependencies: `pdfjs-dist`, `js-tiktoken`, `yauzl`, `fast-xml-parser`, and the `server-only` import guard used by the separate worker. Development-only: `@types/yauzl` and `@electric-sql/pglite-pgvector`. The existing OpenAI SDK and Zod are reused. Phase 8 is not implemented.
+
+[Sarvam Responses API](https://docs.sarvam.ai/api/token-factory/responses-api) | [Sarvam embedding dimensions, task prefixes, and access requirements](https://docs.sarvam.ai/api/token-factory/models/embeddinggemma-2)

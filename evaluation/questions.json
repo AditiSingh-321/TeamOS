@@ -1,0 +1,7 @@
+[
+ {"question":"What authentication tokens are used?","expected_file":"architecture.md","quote":"The project uses JWT authentication with rotating refresh tokens."},
+ {"question":"Which database stores project records?","expected_file":"architecture.md","quote":"The application stores project records in PostgreSQL."},
+ {"question":"How are production releases deployed?","expected_file":"deployment.md","quote":"Production releases use rolling deployments behind a load balancer."},
+ {"question":"What is the marketing budget?","expected_file":null},
+ {"question":"What is the office cafeteria menu?","expected_file":null}
+]

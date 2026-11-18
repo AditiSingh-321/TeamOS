@@ -16,11 +16,11 @@ const navigation = [
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/dependencies", label: "Dependencies", icon: GitBranch },
   { href: "/my-tasks", label: "My Tasks", icon: ClipboardList },
+  { href: "/assistant", label: "AI Assistant", icon: Sparkles },
+  { href: "/documents", label: "Documents", icon: FileText },
 ];
 
 const upcoming = [
-  { label: "AI Assistant", icon: Sparkles },
-  { label: "Documents", icon: FileText },
   { label: "Settings", icon: Settings },
 ];
 
