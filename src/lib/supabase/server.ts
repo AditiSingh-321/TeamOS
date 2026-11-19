@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { authCookieOptions, supabaseConfig } from "./config";
@@ -21,4 +22,12 @@ export async function createAuthClient(writable = false) {
       },
     },
   });
+}
+
+// Credential checks must never replace a browser's active account/session.
+export function createPasswordVerifier() {
+  const config = supabaseConfig();
+  return config ? createClient(config.url, config.key, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  }) : null;
 }

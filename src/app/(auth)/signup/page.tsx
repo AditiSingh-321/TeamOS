@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Create an account" };
 
 export default function SignupPage() {
   return (
-    <Card className="p-6 sm:p-8">
+    <Card className="p-6 shadow-[var(--shadow-float)] sm:p-8">
       <h1 className="text-2xl font-semibold tracking-tight">Create your account</h1>
       <AuthForm mode="signup" configured={Boolean(supabaseConfig())} googleEnabled={Boolean(googleCallbackUrl())} />
       <p className="mt-5 text-sm text-muted-foreground">

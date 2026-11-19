@@ -118,9 +118,9 @@ export function DocumentsPanel({ project, userId, manager }: { project: { id: st
 
   return <div className="min-w-0 space-y-4">
 
-    <Card className="border-dashed p-6 text-center" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); void upload(e.dataTransfer.files[0]); }}>
+    <Card className="ai-surface border-dashed border-primary/25 p-7 text-center sm:p-10" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); void upload(e.dataTransfer.files[0]); }}>
 
-      <Upload className="mx-auto mb-3 text-primary" size={24} aria-hidden="true" />
+      <span className="mx-auto mb-4 grid size-14 place-items-center rounded-2xl border border-white bg-violet-soft shadow-sm"><Upload className="text-primary" size={23} strokeWidth={1.6} aria-hidden="true"/></span>
 
       <h2 className="font-semibold">Add knowledge to {project.name}</h2>
 
@@ -142,13 +142,13 @@ export function DocumentsPanel({ project, userId, manager }: { project: { id: st
 
     <Card className="overflow-hidden">
 
-      <div className="border-b p-4"><h2 className="font-semibold">Project documents <span className="ml-1 text-sm font-normal text-muted-foreground">{documents.length}</span></h2></div>
+      <div className="section-header"><h2 className="panel-heading">Project documents <span className="ml-1 text-sm font-normal text-muted-foreground">{documents.length}</span></h2></div>
 
-      {loading ? <p role="status" className="flex gap-2 p-5 text-sm text-muted-foreground"><LoaderCircle size={16} className="animate-spin" />Loading documents…</p> : !documents.length ? <div className="p-8 text-center"><FileText className="mx-auto mb-3 text-muted-foreground" /><p className="text-sm text-muted-foreground">Upload your first document to build this project knowledge.</p><button type="button" onClick={() => input.current?.click()} className="mt-3 text-sm text-primary hover:underline">Upload document</button></div> :
+      {loading ? <p role="status" className="flex gap-2 p-5 text-sm text-muted-foreground"><LoaderCircle size={16} className="animate-spin" />Loading documents…</p> : !documents.length ? <div className="p-10 text-center"><FileText className="mx-auto mb-3 text-muted-foreground" /><p className="text-sm text-muted-foreground">Upload your first document to build this project knowledge.</p><button type="button" onClick={() => input.current?.click()} className="mt-3 text-sm text-primary hover:underline">Upload document</button></div> :
 
-      <ul className="divide-y">{documents.map((doc) => <li key={doc.id} className="space-y-3 p-4">
+      <ul className="divide-y">{documents.map((doc) => <li key={doc.id} className="space-y-3 p-5 transition-colors hover:bg-background/60">
 
-        <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><p className="break-words text-sm font-semibold">{doc.filename}</p><p className="mt-1 text-xs text-muted-foreground">{doc.filename.split(".").at(-1)?.toUpperCase()} · {(doc.file_size / 1024).toFixed(1)} KB · {new Date(doc.created_at).toLocaleDateString()} · {doc.uploaded_by_name}</p><p className="mt-1 text-xs text-muted-foreground">{project.name}</p></div><span className={`rounded-full px-2 py-1 text-xs ${doc.processing_status === "Ready" ? "bg-emerald-50 text-emerald-700" : doc.processing_status === "Failed" ? "bg-red-50 text-red-700" : "bg-violet-50 text-violet-700"}`}>{doc.processing_status}</span></div>
+        <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><p className="break-words text-sm font-semibold">{doc.filename}</p><p className="mt-1 text-xs text-muted-foreground">{doc.filename.split(".").at(-1)?.toUpperCase()} · {(doc.file_size / 1024).toFixed(1)} KB · {new Date(doc.created_at).toLocaleDateString()} · {doc.uploaded_by_name}</p><p className="mt-1 text-xs text-muted-foreground">{project.name}</p></div><span className={`rounded-full px-2 py-1 text-xs ${doc.processing_status === "Ready" ? "bg-green-soft text-green-ink" : doc.processing_status === "Failed" ? "bg-rose-soft text-rose-ink" : "bg-violet-soft text-violet-ink"}`}>{doc.processing_status}</span></div>
 
         {doc.error_message && <p className="text-xs text-destructive">{doc.error_message}</p>}
 

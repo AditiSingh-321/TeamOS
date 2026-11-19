@@ -3,10 +3,10 @@ import { cn } from "@/lib/utils";
 import type { ProjectIcon as IconName } from "@/types/workspace";
 
 const styles = {
-  rocket: { Icon: Rocket, tone: "bg-violet-100 text-violet-700" },
-  layers: { Icon: Layers3, tone: "bg-blue-100 text-blue-700" },
-  chart: { Icon: BarChart3, tone: "bg-amber-100 text-amber-800" },
-  compass: { Icon: Compass, tone: "bg-emerald-100 text-emerald-800" },
+  rocket: { Icon: Rocket, tone: "bg-violet-soft text-violet-ink" },
+  layers: { Icon: Layers3, tone: "bg-blue-soft text-blue-ink" },
+  chart: { Icon: BarChart3, tone: "bg-amber-soft text-amber-ink" },
+  compass: { Icon: Compass, tone: "bg-green-soft text-green-ink" },
 };
 
 export function ProjectIcon({ name }: { name: IconName }) {

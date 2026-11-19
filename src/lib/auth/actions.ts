@@ -1,5 +1,6 @@
 "use server";
 
+import { clearRecoveryCookies } from "@/lib/auth/recovery-context";
 import { redirect } from "next/navigation";
 import { googleCallbackUrl } from "@/lib/supabase/config";
 import { createAuthClient } from "@/lib/supabase/server";
@@ -28,6 +29,7 @@ export async function login(_state: AuthFormState, formData: FormData): Promise<
   if (error?.status === 429) return { error: "Too many attempts. Wait a moment and try again." };
   if (error) return { error: "Sign-in is temporarily unavailable. Try again." };
 
+  await clearRecoveryCookies();
   redirect("/");
 }
 
@@ -77,5 +79,6 @@ export async function logout(): Promise<AuthFormState> {
   const { error } = await supabase.auth.signOut({ scope: "local" });
   if (error) return { error: "Couldn't sign out. Try again." };
 
+  await clearRecoveryCookies();
   redirect("/login");
 }

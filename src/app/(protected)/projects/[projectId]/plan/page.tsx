@@ -47,7 +47,7 @@ export default async function PlannerPage({ params, searchParams }: {
               {plans.map((plan, index) => (
                 <li key={plan.id}>
                   <Link href={`/projects/${project.id}/plan?draft=${plan.id}`} scroll={false} aria-current={plan.id === selected?.id ? "page" : undefined}
-                    className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-accent ${plan.id === selected?.id ? "bg-secondary" : ""}`}>
+                    className={`flex items-center gap-2 ui-secondary hover:bg-accent ${plan.id === selected?.id ? "bg-secondary" : ""}`}>
                     <span>Plan {plans.length - index} · {formatDate(plan.created_at)}</span>
                     <Badge variant={plan.status === "approved" ? "green" : "default"}>{plan.status}</Badge>
                   </Link>

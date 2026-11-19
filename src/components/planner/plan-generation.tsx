@@ -25,9 +25,9 @@ export function PlanGeneration({ project, configured, initial }: {
   }, []);
 
   return (
-    <Card className="space-y-4 p-5 sm:p-6">
+    <Card className="ai-surface space-y-5 p-5 sm:p-7">
       <div>
-        <h2 className="font-semibold">Project brief</h2>
+        <h2 className="panel-heading flex items-center gap-2"><span className="grid size-8 place-items-center rounded-lg bg-violet-soft text-primary"><Sparkles size={16} aria-hidden="true"/></span>Project brief</h2>
         <p className="mt-1 text-sm text-muted-foreground">Describe the outcome, requirements, and constraints. Generation sends this brief and the project description to Sarvam AI.</p>
       </div>
       {!configured && <p role="alert" className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">Set SARVAM_API_KEY in the server environment to enable generation.</p>}
@@ -86,7 +86,7 @@ export function PlanGeneration({ project, configured, initial }: {
           <label className="grid gap-1.5 text-sm font-medium">Additional instructions (optional)
             <textarea name="instructions" maxLength={2000} rows={2} defaultValue={initial?.preferences.instructions ?? ""} className={fieldClass} />
           </label>
-          <button type="submit" className="flex w-fit items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60 enabled:hover:bg-primary/90">
+          <button type="submit" className="ui-primary disabled:opacity-60">
             {pending ? <LoaderCircle size={16} aria-hidden="true" className="motion-safe:animate-spin" /> : <Sparkles size={16} aria-hidden="true" />}
             {pending ? "Generating plan…" : initial ? "Regenerate as new draft" : "Generate plan"}
           </button>

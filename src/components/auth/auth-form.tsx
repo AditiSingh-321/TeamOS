@@ -1,12 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { LoaderCircle } from "lucide-react";
 import { useActionState } from "react";
 import { login, signInWithGoogle, signup } from "@/lib/auth/actions";
 import type { AuthFormState } from "@/types/auth";
 
-const fieldStyle = "w-full rounded-md border bg-card px-3 py-2.5 text-sm";
-const buttonStyle = "flex w-full items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60";
+const fieldStyle = "ui-field w-full";
+const buttonStyle = "flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60";
 const initialState: AuthFormState = {};
 
 export function AuthForm({ mode, googleEnabled, configured, callbackError }: {
@@ -38,7 +39,7 @@ export function AuthForm({ mode, googleEnabled, configured, callbackError }: {
             <input id="email" name="email" type="email" autoComplete="email" maxLength={254} required className={fieldStyle} />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="password" className="block text-sm font-medium">Password</label>
+            <div className="flex items-center justify-between gap-2"><label htmlFor="password" className="block text-sm font-medium">Password</label>{!isSignup && <Link href="/forgot-password" className="text-xs font-medium text-primary hover:underline">Forgot Password?</Link>}</div>
             <input id="password" name="password" type="password" autoComplete={isSignup ? "new-password" : "current-password"} minLength={isSignup ? 8 : undefined} maxLength={256} aria-describedby={isSignup ? "password-hint" : undefined} required className={fieldStyle} />
             {isSignup && <p id="password-hint" className="text-xs text-muted-foreground">Use at least 8 characters.</p>}
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { Background, Controls, Handle, MarkerType, Position, ReactFlow, useNodesState, type Node, type NodeProps } from "@xyflow/react";
+import { ArrowRight, GitBranch } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
@@ -19,7 +20,7 @@ type TaskNode = Node<{ task: Task; blocked: boolean; affected: boolean; risk?: b
 function DependencyTaskNode({ data, selected, isConnectable }: NodeProps<TaskNode>) {
   const router = useRouter();
   return (
-    <Card className={cn("w-60 space-y-2 border-2 p-3", data.blocked && "border-amber-500 bg-amber-50", data.risk && "border-rose-500 bg-rose-50", data.affected && "ring-2 ring-violet-500 ring-offset-2", selected && "outline-2 outline-primary")}>
+    <Card className={cn("w-60 space-y-2.5 rounded-xl border p-4", data.blocked && "border-amber-400 bg-amber-soft", data.risk && "border-rose-400 bg-rose-soft", data.affected && "ring-2 ring-primary/60 ring-offset-3", selected && "outline-2 outline-primary")}>
       <Handle type="target" position={Position.Left} isConnectable={isConnectable} aria-label="Prerequisites" />
       <button type="button" onClick={(event) => {
         event.stopPropagation();
@@ -83,34 +84,34 @@ export function DependencyGraph({ tasks, edges, workspace, projectId, userId, ri
   const flowEdges = edges.map((edge) => ({
     id: `${edge.source_id}:${edge.target_id}`, source: edge.source_id, target: edge.target_id,
     markerEnd: { type: MarkerType.ArrowClosed },
-    style: { stroke: affected.includes(edge.target_id) && (edge.source_id === delayedId || riskSources.includes(edge.source_id) || affected.includes(edge.source_id)) ? "#7c3aed" : "#94a3b8", strokeWidth: 2 },
+    style: { stroke: affected.includes(edge.target_id) && (edge.source_id === delayedId || riskSources.includes(edge.source_id) || affected.includes(edge.source_id)) ? "var(--primary)" : "var(--edge)", strokeWidth: 2 },
   }));
 
   return (
     <div className="space-y-5">
       <Card className="space-y-3 p-4">
-        <p className="text-sm text-muted-foreground">Arrows run from prerequisite to dependent task. Amber tasks have unfinished prerequisites. Select a task to view its details.</p>
+        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="panel-heading flex items-center gap-2"><GitBranch size={18} className="text-primary" aria-hidden="true"/>Dependency map</h2><p className="flex items-center gap-2 text-xs text-muted-foreground">Prerequisite<ArrowRight size={14} aria-hidden="true"/>Dependent task</p></div><div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground"><span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-amber-ink"/>Blocked</span><span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-rose-ink"/>Active risk</span><span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-primary"/>Downstream impact</span><span>Select a task for details</span></div>
         {editableTargets.length > 0 && (
           <form onSubmit={(event) => { event.preventDefault(); submitEdge(sourceId, targetId); }} className="flex flex-wrap items-end gap-3">
-            <label className="grid min-w-0 max-w-full gap-1 text-sm font-medium">Prerequisite
-              <select aria-label="Prerequisite task" required value={sourceId} onChange={(event) => setSourceId(event.target.value)} disabled={pending} className={cn(fieldClass, "max-w-64")}>
+            <label className="grid min-w-0 max-w-full flex-1 gap-1.5 text-xs font-medium text-muted-foreground">Prerequisite
+              <select aria-label="Prerequisite task" required value={sourceId} onChange={(event) => setSourceId(event.target.value)} disabled={pending} className={cn(fieldClass, "w-full")}>
                 <option value="">Choose a task</option>
                 {tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}
               </select>
             </label>
-            <label className="grid min-w-0 max-w-full gap-1 text-sm font-medium">Dependent task
-              <select aria-label="Dependent task" required value={targetId} onChange={(event) => setTargetId(event.target.value)} disabled={pending} className={cn(fieldClass, "max-w-64")}>
+            <label className="grid min-w-0 max-w-full flex-1 gap-1.5 text-xs font-medium text-muted-foreground">Dependent task
+              <select aria-label="Dependent task" required value={targetId} onChange={(event) => setTargetId(event.target.value)} disabled={pending} className={cn(fieldClass, "w-full")}>
                 <option value="">Choose a task</option>
                 {editableTargets.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}
               </select>
             </label>
-            <button type="submit" disabled={pending} className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">{pending ? "Saving…" : "Add dependency"}</button>
+            <button type="submit" disabled={pending} className="ui-primary disabled:opacity-60">{pending ? "Saving…" : "Add dependency"}</button>
           </form>
         )}
         {notice.error && <p role="alert" className="text-sm text-destructive">{notice.error}</p>}
         <p role="status" className="text-sm text-emerald-800">{notice.message}</p>
       </Card>
-      <div className="h-[520px] overflow-hidden rounded-lg border bg-white" aria-label="Task dependency graph">
+      <div className="h-[420px] overflow-hidden sm:h-[520px] rounded-2xl border bg-background shadow-inner" aria-label="Task dependency graph">
         <ReactFlow<TaskNode> nodes={nodes.map((node) => ({ ...node, data: { ...node.data, affected: affected.includes(node.id), risk: riskSources.includes(node.id) } }))}
           edges={flowEdges} nodeTypes={nodeTypes} onNodesChange={onNodesChange}
           onNodeClick={(_, node) => openTask(node.id)}
@@ -120,13 +121,13 @@ export function DependencyGraph({ tasks, edges, workspace, projectId, userId, ri
             && validateDependency(tasks, edges, { source_id: connection.source, target_id: connection.target }) === null}
           nodesConnectable={!pending && editableTargets.length > 0}
           nodesDraggable fitView minZoom={0.2} maxZoom={2} deleteKeyCode={null} edgesReconnectable={false}>
-          <Background />
+          <Background gap={22} size={1} />
           <Controls showInteractive={false} />
         </ReactFlow>
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
         <Card className="space-y-3 p-5">
-          <h2 className="font-semibold">Delay impact</h2>
+          <h2 className="panel-heading">Delay impact</h2>
           <label className="grid gap-1 text-sm font-medium">If this task is delayed
             <select aria-label="Delayed task" value={delayedId} onChange={(event) => setDelayedId(event.target.value)} className={cn(fieldClass, "w-full")}>
               <option value="">Choose a task</option>
@@ -135,18 +136,18 @@ export function DependencyGraph({ tasks, edges, workspace, projectId, userId, ri
           </label>
           {delayedId && <p className="text-sm text-muted-foreground">{affected.length} downstream {affected.length === 1 ? "task" : "tasks"} connected to this task.</p>}
           {affected.length > 0 && <ul className="space-y-2">{affected.map((id) => (
-            <li key={id}><button type="button" onClick={() => openTask(id)} className="rounded text-left text-sm text-primary hover:underline">{peopleTasks.get(id)!.title}</button></li>
+            <li key={id} className="py-2"><button type="button" onClick={() => openTask(id)} className="rounded text-left text-sm text-primary hover:underline">{peopleTasks.get(id)!.title}</button></li>
           ))}</ul>}
         </Card>
         <Card className="space-y-3 p-5">
-          <h2 className="font-semibold">Prerequisite order</h2>
-          <ol className="list-inside list-decimal space-y-2 text-sm">{order.map((id) => (
-            <li key={id}><button type="button" onClick={() => openTask(id)} className="rounded text-left text-primary hover:underline">{peopleTasks.get(id)!.title}</button></li>
+          <h2 className="panel-heading">Prerequisite order</h2>
+          <ol className="list-inside list-decimal divide-y text-sm marker:text-muted-foreground">{order.map((id) => (
+            <li key={id} className="py-2"><button type="button" onClick={() => openTask(id)} className="rounded text-left text-primary hover:underline">{peopleTasks.get(id)!.title}</button></li>
           ))}</ol>
         </Card>
       </div>
       <Card className="space-y-3 p-5">
-        <h2 className="font-semibold">Dependencies</h2>
+        <h2 className="panel-heading">Dependencies</h2>
         {!edges.length && <p className="text-sm text-muted-foreground">No dependencies yet. Add one using the form or drag between node handles.</p>}
         <ul className="divide-y">{edges.map((edge) => (
           <li key={`${edge.source_id}:${edge.target_id}`} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">

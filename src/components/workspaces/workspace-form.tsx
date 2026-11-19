@@ -17,7 +17,7 @@ export function WorkspaceForm({ action, label, children, compact = false, danger
     <form action={submit} aria-busy={pending} className="space-y-2">
       <fieldset disabled={pending} className={cn("min-w-0 gap-3", compact ? "flex flex-wrap items-center" : "grid")}>
         {children}
-        <button type="submit" className={cn("w-fit rounded-md px-3 py-2 text-sm font-semibold text-white transition-colors disabled:opacity-60",
+        <button type="submit" className={cn("ui-primary disabled:opacity-60",
           danger ? "bg-destructive enabled:hover:bg-destructive/90" : "bg-primary enabled:hover:bg-primary/90")}>
           {pending ? "Working…" : label}
         </button>

@@ -1,3 +1,5 @@
+import { GitBranch } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectPresence } from "@/components/collaboration/project-presence";
 import { riskSummary } from "@/lib/intelligence/queries";
 import type { Metadata } from "next";
@@ -45,7 +47,7 @@ export default async function DependenciesPage({ searchParams }: {
             <nav aria-label="Dependency projects" className="flex flex-wrap gap-2">
               {board.projects.map((entry) => (
                 <Link key={entry.id} href={`/dependencies?project=${entry.id}`} aria-current={entry.id === project?.id ? "page" : undefined}
-                  className={`max-w-full break-words rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent ${entry.id === project?.id ? "bg-secondary text-secondary-foreground" : ""}`}>{entry.name}</Link>
+                  className={`max-w-full break-words ui-secondary font-medium hover:bg-accent ${entry.id === project?.id ? "bg-secondary text-secondary-foreground" : ""}`}>{entry.name}</Link>
               ))}
             </nav>
             {!board.projects.length && <p className="text-sm text-muted-foreground">Create a project and add tasks to start a dependency graph.</p>}
@@ -57,7 +59,7 @@ export default async function DependenciesPage({ searchParams }: {
       {graphError && <p role="alert" className="text-sm text-destructive">{graphError}</p>}
       {active && project && graph && !graphError && (
         tasks.length ? <DependencyGraph key={JSON.stringify([project.id, tasks, graph.edges])} tasks={tasks} edges={graph.edges} riskSources={risks?.sources??[]} riskAffected={risks?.affected_ids??[]} workspace={active} projectId={project.id} userId={profile.id} />
-          : <Card className="p-5 text-sm text-muted-foreground">No tasks in this project yet. <Link href="/my-tasks?task=new" className="rounded font-semibold text-primary hover:underline">Create a task</Link> and select this project.</Card>
+          : <Card><EmptyState icon={GitBranch} title="Connect your project’s next steps" description="Add tasks to this project, then link prerequisites to see blockers and downstream impact."><Link href="/my-tasks?task=new" className="ui-primary">Create a task</Link></EmptyState></Card>
       )}
       {active && board && project && selected && comments && (
         <TaskDrawer key={selected.id} title={selected.title} closeHref={closeHref}>

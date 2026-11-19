@@ -405,3 +405,47 @@ Automated commands: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, an
 Optional live transport test: provision two isolated accounts and an existing disposable project whose name starts `TEST Realtime`. Configure `TEAMOS_REALTIME_TEST=1`, `REALTIME_TEST_PROJECT_ID`, `REALTIME_TEST_USER_A_EMAIL`, `REALTIME_TEST_USER_A_PASSWORD`, `REALTIME_TEST_USER_B_EMAIL`, and `REALTIME_TEST_USER_B_PASSWORD` in the shell (never commit these values). Account A must be a project-workspace manager; B must be a member. With Phase 11 migration/publication configured, run `node --env-file=.env.local --experimental-strip-types --import ./tests/register.mjs --test tests/realtime-live.test.mjs`. It creates/deletes only its uniquely named test task and leaves project/accounts intact. Without opt-in credentials the test is explicitly skipped.
 
 Known limits: activity/notifications follow their workspace/project retention lifecycle; no archival job is added. Notification pages use bounded offset pagination and may shift under concurrent inserts; reload/page navigation always reads current state. Server-rendered views refetch in batches rather than applying row diffs; busy workspaces can still trigger server queries. Presence roster display is capped at 1,000 members and is advisory; reconnecting may briefly flicker. No offline write queue, external notifications, chat, autonomous actions, or Phase 12 features are introduced.
+
+## Frontend visual refresh
+
+The November 2026 visual refresh applies a light blue/lavender design across the existing application. It introduces no product phase, new dependency, database migration, API contract, authentication change, AI configuration change, or new business workflow. Settings remains Coming Soon because there is no implemented Settings route. No separate reference image accompanied the design request; the supplied written visual direction was used.
+
+Design tokens live in `src/app/globals.css`: white surfaces, a `#F7F9FF` background, restrained blue/violet/pink ambient accents, navy text, semantic status colors, consistent radii, shadows, input states, and focus rings. The existing bundled Geist font is retained for a modern sans-serif without a new font download. CSS gradients and an SVG completion ring supply decoration/visualization without image or chart packages. The completion chart uses the existing real task totals; no trend, activity, AI insight, or team member is fabricated.
+
+Main presentation files:
+
+- `src/components/layout/app-shell.tsx`: light sidebar, grouped existing navigation, workspace links, page context, existing bell/account/live controls, and the responsive native navigation drawer.
+
+- `src/components/dashboard/dashboard-panels.tsx`, `workspace-stats.tsx`, and `src/app/(protected)/page.tsx`: hero, existing-route actions, KPI cards, real project progress, task completion, upcoming tasks, health, and durable activity.
+
+- `src/components/ui/{card,badge,empty-state,loading-panel}.tsx`, `layout/page-heading.tsx`, and `workspaces/styles.ts`: shared surfaces, labels, empty states, skeletons, typography, fields, and buttons.
+
+- `src/components/{projects,tasks,dependencies}`: project cards, current dnd-kit Kanban, task drawer, and existing React Flow nodes/canvas/controls. Drag/drop handlers, optimistic state, graph algorithms, and permission conditions are preserved.
+
+- `src/components/{planner,knowledge,intelligence}`: planner forms and review cards, assistant composer/messages/citations, document upload/list, risk evidence, meeting review, and action comparisons. Existing submissions, polling, citations, and approvals are retained.
+
+- `src/components/collaboration/{notifications,activity-feed}.tsx`: notification rows/empty states/preferences, a viewport-bounded mobile dropdown, and the activity timeline. Subscription logic is unchanged.
+
+- `src/app/(auth)` and `src/components/auth`: coordinated authentication surfaces, fields, account menu, and existing login/signup/OAuth actions.
+
+One narrowly scoped query correction was needed during browser verification: `src/lib/tasks/queries.ts` now explicitly selects the existing composite comment-to-mentions foreign key. The Phase 11 schema has both simple and composite relationships, so the previous unqualified embed returned Supabase `PGRST201` and prevented comments from loading. Qualifying the existing relationship restores comment/mention reads without changing permissions, schema, selected fields, or mutation behavior. The hosted query and existing comment drawer were checked successfully.
+
+Verification: `pnpm typecheck`, `pnpm lint`, `pnpm test`, and `pnpm build`. The existing automated suite passed 76 tests with 0 failures; its optional isolated-account live Realtime test remained skipped. AI calls in the automated suite are mocked. Browser review covered Dashboard, Projects, My Tasks, task drawer/comments, Dependencies, AI Planner, Assistant, Documents, Risk Center, Meetings, Approval Center, Notifications, and Workspaces. Layout checks used 375×812, 768×1024, and 1440×1000 viewports. Normal pages had no horizontal overflow; the Kanban has its own horizontal scrolling area. Checks included priority/unread filters, drawer/menu opening and Escape dismissal, composer enable/reset, required meeting-field validation, a same-column drag, the notification dropdown, and the existing Live indicator.
+
+The refresh was reviewed against the current account's real records. Paid AI generation, destructive mutations, external OAuth, cross-column task writes, and concurrent multi-account workflows were not replayed against hosted user data. The selected project had no graph nodes, so live node connections were not exercised; existing deterministic graph and database integration tests passed. No new claim of complete accessibility certification or live transport load testing is made. Key normal text, primary-button, and status-badge color pairs were checked above 4.5:1 contrast; visible focus, semantic labels, native dialogs, non-color status text, and reduced-motion styles are maintained.
+
+### UI/UX quality pass
+
+A follow-up rendered review tightened dashboard hierarchy and density: a personal welcome, smaller KPI cards, compact completion chart, and upcoming tasks alongside project health. The assistant now has smaller starter cards, a compact project picker, an expandable help note, and a shorter composer visible at the reviewed desktop size. On narrow screens chat uses page scrolling rather than an extra nested message scroller.
+
+Kanban has clearer column headings, visible task counts, and responsive filters with readable full-width selections on mobile. Risk Center uses a compact project toolbar, a quieter queue status strip, distinct KPI icons, and a factual compact empty state. Dependency views have a direction/state legend, aligned controls, responsive canvas sizing, and explicit light-theme control colors to prevent white-on-white zoom icons. Shared loading skeletons reflect the knowledge panel layout. No backend queries, actions, permissions, persistence, AI calls, or graph algorithms were changed in this quality pass.
+
+Manual review used desktop (1440×1000), tablet (768×1024), and mobile (375×812) browser views, including priority filtering/reset and opening/closing the existing task drawer. A temporary local graph fixture verified populated nodes, blockers, zoom-control contrast, and two downstream highlights; it was removed before the production build and created no database records. The live project's empty graph state was also checked. No new reference image was attached to the quality-review request, so the established blue/lavender design direction was retained. Paid AI and destructive hosted mutations were not invoked. Verification: lint, TypeScript, production build, and the existing suite (76 passed, 0 failed, 1 optional live Realtime test skipped).
+
+## Password recovery and Account Security
+
+Login now includes **Forgot Password?**. `/forgot-password` requests a Supabase recovery email; `/verify-reset-code` verifies a six-digit **recovery** OTP when the email template is configured. Links use server-side token-hash verification, with a signed browser-bound PKCE fallback for default emails. Both lead to `/reset-password`; successful recovery requires fresh login. `/settings/security` verifies the current password, supports provider reauthentication, and updates through Supabase Auth. Google OAuth is preserved.
+
+Set server-only `TEAMOS_RECOVERY_SECRET`, configure exact Supabase redirect URLs, and install the prepared template when your provider permits editing. No migrations, custom OTP storage, admin password APIs, or packages are added. See [setup, SMTP/template instructions, security and live-test checklist](docs/password-recovery.md) and [recovery email HTML](supabase/templates/recovery.html). A local signing secret was generated privately; deployment needs its own configured secret. Provider email setup and end-to-end delivery remain manual verification steps.
+
+Recovery verification: lint, TypeScript and production build passed. The complete suite passed 95 tests with 0 failures and 1 optional live Realtime test skipped (96 total). Browser checks covered recovery layout/input behavior and unauthorized-route denial; no real passwords were changed or recovery emails sent.

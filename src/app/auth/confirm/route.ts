@@ -1,7 +1,9 @@
+import { handleRecoveryLink } from "@/lib/auth/recovery-link";
 import { createAuthClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  if (searchParams.get("type") === "recovery") return handleRecoveryLink(request);
   const tokenHash = searchParams.get("token_hash");
   const supabase = await createAuthClient(true);
   let location = "/login?error=confirmation";

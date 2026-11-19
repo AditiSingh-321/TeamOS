@@ -1,7 +1,7 @@
 "use client";
 
 import { DragDropProvider, useDraggable, useDroppable } from "@dnd-kit/react";
-import { CalendarDays, GripVertical } from "lucide-react";
+import { CalendarDays, GripVertical, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useOptimistic, useState, useTransition, type ReactNode } from "react";
@@ -13,18 +13,18 @@ import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/workspace";
 import { taskPriorities, taskStatuses, type Task, type TaskProject, type TaskStatus } from "@/types/task";
 import type { WorkspaceMember, WorkspaceSummary } from "@/types/team";
-import { PriorityBadge, TaskStatusBadge } from "./task-badges";
+import { PriorityBadge } from "./task-badges";
 
 function Column({ status, count, children }: { status: TaskStatus; count: number; children: ReactNode }) {
   const { ref, isDropTarget } = useDroppable({ id: status, accept: "task" });
   return (
-    <section ref={ref} aria-label={status} className={cn("min-h-52 w-64 shrink-0 rounded-lg border bg-muted/55 p-3 xl:w-auto xl:min-w-0", isDropTarget && "border-violet-400 bg-violet-50")}>
-      <div className="mb-3 flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold"><TaskStatusBadge status={status} /></h2>
-        <span className="text-xs text-muted-foreground">{count}</span>
+    <section ref={ref} aria-label={status} className={cn("min-h-80 w-72 shrink-0 rounded-2xl border border-border/75 bg-muted/65 p-3 xl:w-auto xl:min-w-0", isDropTarget && "border-primary/50 bg-violet-soft/60")}>
+      <div className="mb-4 flex items-center justify-between px-1 pt-1">
+        <h2 className="flex items-center gap-2 text-xs font-semibold"><span aria-hidden="true" className={cn("size-2 rounded-full", status === "Done" ? "bg-green-ink" : status === "In Progress" ? "bg-blue-ink" : status === "Review" ? "bg-primary" : "bg-muted-foreground")} />{status}</h2>
+        <span className="grid size-6 place-items-center rounded-md bg-card/80 text-[11px] font-medium text-muted-foreground">{count}</span>
       </div>
       {children}
-      {!count && <p className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">No tasks</p>}
+      {!count && <p className="rounded-md border border-dashed border-border/90 bg-card/40 p-5 text-center text-xs text-muted-foreground">No tasks</p>}
     </section>
   );
 }
@@ -39,9 +39,9 @@ function TaskItem({ task, draggable, project, assignee, href }: {
   const { ref, handleRef, isDragging } = useDraggable({ id: task.id, type: "task", disabled: !draggable });
   return (
     <li ref={ref} className={cn("break-words", isDragging && "opacity-70")}>
-      <Card className="space-y-3 p-3">
+      <Card className="task-card space-y-3 rounded-xl p-3.5">
         <div className="flex items-start justify-between gap-2">
-          <Link href={href} scroll={false} className="min-w-0 rounded text-sm font-semibold hover:text-primary hover:underline">{task.title}</Link>
+          <Link href={href} scroll={false} className="min-w-0 rounded text-[13px] font-semibold leading-6 hover:text-primary hover:underline">{task.title}</Link>
           {draggable && (
             <button ref={handleRef} type="button" aria-label={`Drag ${task.title}`} className="shrink-0 touch-none cursor-grab rounded p-1 text-muted-foreground hover:bg-muted active:cursor-grabbing">
               <GripVertical size={16} aria-hidden="true" />
@@ -53,7 +53,7 @@ function TaskItem({ task, draggable, project, assignee, href }: {
           <PriorityBadge priority={task.priority} />
           {task.due_date && <time dateTime={task.due_date} className="inline-flex items-center gap-1 text-xs text-muted-foreground"><CalendarDays size={13} aria-hidden="true" />{formatDate(task.due_date, { month: "short", day: "numeric" })}</time>}
         </div>
-        <p className="truncate text-xs text-muted-foreground">{assignee ?? "Unassigned"}</p>
+        <div className="flex items-center gap-2 border-t pt-2.5"><span aria-hidden="true" className="grid size-6 shrink-0 place-items-center rounded-full bg-violet-soft text-[10px] font-semibold text-violet-ink">{assignee?.slice(0,1).toUpperCase() ?? "–"}</span><p className="truncate text-[11px] text-muted-foreground">{assignee ?? "Unassigned"}</p></div>
       </Card>
     </li>
   );
@@ -86,24 +86,25 @@ export function TaskBoard({ tasks, members, projects, workspace, userId, mine }:
 
   return (
     <div className="space-y-4">
-      <Card className="flex flex-wrap items-end gap-3 p-4">
-        <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+      <Card className="grid grid-cols-2 items-end gap-3 p-4 sm:flex sm:flex-wrap">
+        <span className="mb-3 hidden items-center gap-2 pr-2 text-xs font-medium text-muted-foreground sm:flex"><SlidersHorizontal size={15} aria-hidden="true"/>Filters</span>
+        <label className="grid min-w-0 flex-1 gap-1 text-xs font-medium text-muted-foreground">
           Status
-          <select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)} className={fieldClass}>
+          <select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)} className={cn(fieldClass, "w-full")}>
             <option value="">All statuses</option>
             {taskStatuses.map((value) => <option key={value}>{value}</option>)}
           </select>
         </label>
-        <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+        <label className="grid min-w-0 flex-1 gap-1 text-xs font-medium text-muted-foreground">
           Priority
-          <select aria-label="Filter by priority" value={priority} onChange={(event) => setPriority(event.target.value)} className={fieldClass}>
+          <select aria-label="Filter by priority" value={priority} onChange={(event) => setPriority(event.target.value)} className={cn(fieldClass, "w-full")}>
             <option value="">All priorities</option>
             {taskPriorities.map((value) => <option key={value}>{value}</option>)}
           </select>
         </label>
-        <label className="grid max-w-full gap-1 text-xs font-medium text-muted-foreground">
+        <label className="col-span-2 grid min-w-0 max-w-full flex-1 gap-1 text-xs font-medium text-muted-foreground">
           Assignee
-          <select aria-label="Filter by assignee" value={assignee} onChange={(event) => setAssignee(event.target.value)} className={cn(fieldClass, "max-w-52 truncate")}>
+          <select aria-label="Filter by assignee" value={assignee} onChange={(event) => setAssignee(event.target.value)} className={cn(fieldClass, "w-full truncate")}>
             <option value="">Everyone</option>
             <option value="unassigned">Unassigned</option>
             {members.map((member) => (
@@ -114,6 +115,7 @@ export function TaskBoard({ tasks, members, projects, workspace, userId, mine }:
           </select>
         </label>
         {(status || priority || assignee) && <button type="button" onClick={() => { setStatus(""); setPriority(""); setAssignee(""); }} className="rounded px-2 py-2 text-sm font-medium text-primary hover:underline">Clear filters</button>}
+        <p className="col-span-2 text-xs text-muted-foreground sm:mb-3 sm:ml-auto" aria-live="polite">{visible.length} of {tasks.length} tasks</p>
       </Card>
       {notice.error && <p role="alert" className="text-sm text-destructive">{notice.error}</p>}
       <p role="status" className="sr-only">{saving ? "Saving task status…" : notice.message}</p>

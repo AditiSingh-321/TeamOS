@@ -13,7 +13,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     : error === "oauth" ? "Google sign-in couldn't be completed. Try again." : undefined;
 
   return (
-    <Card className="p-6 sm:p-8">
+    <Card className="p-6 shadow-[var(--shadow-float)] sm:p-8">
       <h1 className="text-2xl font-semibold tracking-tight">Sign in to TeamOS</h1>
       <p className="mt-1.5 text-sm text-muted-foreground">Access your team dashboard.</p>
       <AuthForm mode="login" configured={Boolean(supabaseConfig())} googleEnabled={Boolean(googleCallbackUrl())} callbackError={callbackError} />

@@ -32,7 +32,7 @@ export function PlanLifecycle({ projectId, saved }: { projectId: string; saved: 
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   return (
-    <Card className="space-y-3 p-5">
+    <Card className="space-y-4 p-5 sm:p-6">
       <Badge>{saved.status}</Badge>
       <p className="text-sm text-muted-foreground">
         {saved.status === "generating" ? "Generation is pending. Refresh to check progress, or cancel and generate a new draft if it has been interrupted."
@@ -165,7 +165,7 @@ export function PlanEditor({ projectId, saved }: { projectId: string; saved: Sav
         </Card>
       ))}
       {editable && <button type="button" disabled={pending || plan.tasks.length >= maxPlanTasks} onClick={() => changePlan({ ...plan, tasks: [...plan.tasks, newDraftTask()] })}
-        className="rounded-md border bg-card px-3 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-60">Add manual task</button>}
+        className="ui-field font-semibold hover:bg-muted disabled:opacity-60">Add manual task</button>}
 
       <Card className="space-y-3 p-5 sm:p-6">
         <h3 className="font-semibold">Suggested implementation order</h3>
@@ -179,8 +179,8 @@ export function PlanEditor({ projectId, saved }: { projectId: string; saved: Sav
               I reviewed these suggestions and approve creating {plan.tasks.length} project tasks.
             </label>
             <div className="flex flex-wrap gap-3">
-              <button type="button" disabled={pending || Boolean(invalid)} onClick={() => submit("save")} className="rounded-md border px-3 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-60">Save draft</button>
-              <button type="button" disabled={pending || Boolean(invalid) || !reviewed} onClick={() => submit("approve")} className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60">Approve &amp; Create Tasks</button>
+              <button type="button" disabled={pending || Boolean(invalid)} onClick={() => submit("save")} className="ui-secondary font-semibold hover:bg-muted disabled:opacity-60">Save draft</button>
+              <button type="button" disabled={pending || Boolean(invalid) || !reviewed} onClick={() => submit("approve")} className="ui-primary hover:bg-primary/90 disabled:opacity-60">Approve &amp; Create Tasks</button>
               <button type="button" disabled={pending} onClick={() => submit("cancel")} className="rounded px-2 py-2 text-sm font-semibold text-destructive hover:underline disabled:opacity-60">Cancel draft</button>
             </div>
           </>

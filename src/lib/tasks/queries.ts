@@ -43,7 +43,7 @@ export async function getTaskBoard(workspaceId: string) {
 export async function getTaskComments(workspaceId: string, taskId: string) {
   const supabase = await createAuthClient();
   if (!supabase) return { rows: [], error: true };
-  return collectRows((start, end) => supabase.from("task_comments").select("id, author_id, body, created_at, mentions:task_comment_mentions(user_id)")
+  return collectRows((start, end) => supabase.from("task_comments").select("id, author_id, body, created_at, mentions:task_comment_mentions!task_comment_mentions_workspace_id_comment_id_fkey(user_id)")
     .eq("workspace_id", workspaceId).eq("task_id", taskId).order("created_at").order("id").range(start, end)
     .overrideTypes<TaskComment[], { merge: false }>());
 }

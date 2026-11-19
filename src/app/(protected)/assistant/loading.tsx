@@ -1,1 +1,2 @@
-export default function Loading() { return <p role="status" className="text-sm text-muted-foreground">Loading project knowledge...</p>; }
+import { LoadingPanel } from "@/components/ui/loading-panel";
+export default function Loading() { return <LoadingPanel label="Loading project assistant"/>; }

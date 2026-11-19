@@ -1,6 +1,6 @@
 import "server-only";
 
-function secureOrigin(value: string | undefined) {
+export function secureOrigin(value: string | undefined) {
   try {
     const url = new URL(value ?? "");
     const localHttp = url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
@@ -30,3 +30,8 @@ export const authCookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
 };
+
+export function recoveryCallbackUrl() {
+  const origin = secureOrigin(process.env.TEAMOS_SITE_URL);
+  return origin ? new URL("/auth/recovery", origin).toString() : null;
+}

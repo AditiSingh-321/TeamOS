@@ -1,24 +1,12 @@
-import { CheckCircle2, ClipboardList, FolderKanban, Hourglass } from "lucide-react";
+import { ArrowUpRight,CheckCircle2,ClipboardList,FolderKanban,Hourglass } from "lucide-react";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import type { TaskCounts } from "@/types/task";
-
-export function WorkspaceStats({ projectCount, tasks }: { projectCount: number | null; tasks: TaskCounts | null }) {
-  const stats = [
-    { label: "Total Projects", value: projectCount ?? "—", icon: FolderKanban, tone: "bg-violet-100 text-violet-800" },
-    { label: "Total Tasks", value: tasks?.total ?? "—", icon: ClipboardList, tone: "bg-blue-100 text-blue-800" },
-    { label: "Completed Tasks", value: tasks?.done ?? "—", icon: CheckCircle2, tone: "bg-emerald-100 text-emerald-800" },
-    { label: "Pending Tasks", value: tasks ? tasks.total - tasks.done : "—", icon: Hourglass, tone: "bg-amber-100 text-amber-800" },
-  ];
-
-  return (
-    <section aria-label="Workspace statistics" className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:gap-5">
-      {stats.map(({ label, value, icon: Icon, tone }) => (
-        <Card key={label} className="p-4 sm:p-5">
-          <span className={`mb-3 grid size-9 place-items-center rounded-[9px] ${tone}`}><Icon size={18} aria-hidden="true" /></span>
-          <p className="text-xs font-medium text-muted-foreground sm:text-sm">{label}</p>
-          <p className="mt-1 text-[1.8rem] font-semibold leading-none tracking-tight tabular-nums">{value}</p>
-        </Card>
-      ))}
-    </section>
-  );
+export function WorkspaceStats({projectCount,tasks}:{projectCount:number|null;tasks:TaskCounts|null}){
+ const stats=[{label:"Total projects",value:projectCount??"—",icon:FolderKanban,tone:"bg-violet-soft text-violet-ink",href:"/projects"},{label:"Total tasks",value:tasks?.total??"—",icon:ClipboardList,tone:"bg-blue-soft text-blue-ink",href:"/my-tasks"},{label:"Completed tasks",value:tasks?.done??"—",icon:CheckCircle2,tone:"bg-green-soft text-green-ink",href:"/my-tasks"},{label:"Pending tasks",value:tasks?tasks.total-tasks.done:"—",icon:Hourglass,tone:"bg-amber-soft text-amber-ink",href:"/my-tasks"}];
+ return <section aria-label="Workspace statistics" className="grid grid-cols-2 gap-3 xl:grid-cols-4 xl:gap-5">{stats.map(({label,value,icon:Icon,tone,href})=><Card key={label} className="relative overflow-hidden p-4 sm:p-5"><div className="absolute right-3 bottom-4 flex items-center gap-1 sm:right-4 sm:gap-2"><span className={`grid size-8 place-items-center rounded-xl ${tone}`}><Icon size={17} strokeWidth={1.7} aria-hidden="true"/></span><Link href={href} aria-label={href==="/projects"?"Open projects":"Open task board"} className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-primary"><ArrowUpRight size={14}/></Link></div><p className="min-h-8 text-xs sm:min-h-4 font-medium text-muted-foreground">{label}</p><p className="mt-2 text-[1.8rem] sm:mt-4 font-semibold leading-none tracking-[-0.045em] tabular-nums sm:text-[2rem]">{value}</p></Card>)}</section>;
+}
+export function TaskOverview({tasks}:{tasks:TaskCounts|null}){
+ const done=tasks?.done??0,total=tasks?.total??0,pending=total-done;const percent=total?Math.round(done/total*100):0;
+ return <Card className="flex h-full flex-col p-5"><div className="flex items-center justify-between"><h2 className="panel-heading">Task completion</h2><span className="rounded-md bg-green-soft px-2 py-1 text-[11px] font-medium text-green-ink">Workspace</span></div><div className="mt-4 flex items-center gap-5"><div className="relative grid size-28 shrink-0 place-items-center"><svg viewBox="0 0 160 160" role="img" aria-label={tasks?`${done} of ${total} tasks completed`:"Task statistics unavailable"} className="absolute inset-0 size-full -rotate-90"><circle cx="80" cy="80" r="66" fill="none" stroke="var(--muted)" strokeWidth="12"/><circle cx="80" cy="80" r="66" fill="none" stroke="var(--primary)" strokeWidth="12" strokeLinecap="round" strokeOpacity={percent?1:0} strokeDasharray={`${2*Math.PI*66}`} strokeDashoffset={`${2*Math.PI*66*(1-percent/100)}`}/></svg><div className="text-center"><p className="text-2xl font-semibold tracking-tight">{tasks?`${percent}%`:"—"}</p><p className="mt-1 text-[11px] text-muted-foreground">Completed</p></div></div><div className="grid flex-1 gap-3 border-l pl-5"><div><p className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="size-1.5 rounded-full bg-primary"/>Done</p><p className="mt-1 text-lg font-semibold tabular-nums">{tasks?done:"—"}</p></div><div><p className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="size-1.5 rounded-full bg-muted-foreground/40"/>Remaining</p><p className="mt-1 text-lg font-semibold tabular-nums">{tasks?pending:"—"}</p></div></div></div></Card>;
 }
