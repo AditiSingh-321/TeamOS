@@ -32,7 +32,7 @@ export function ProjectCard({ project, editable }: { project: Project; editable:
         <ProjectIcon name="layers" />
         <ProjectStatusBadge status={project.status} />
       </div>
-      <h2 className="text-base font-semibold tracking-tight">{project.name}</h2>
+      <h2 className="text-base font-semibold tracking-tight"><Link href={`/projects/${project.id}`} className="rounded hover:text-primary hover:underline">{project.name}</Link></h2>
       <p className="mb-5 mt-1.5 flex-1 text-sm leading-6 text-muted-foreground">{project.description}</p>
       <ProjectProgress project={project} />
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4">

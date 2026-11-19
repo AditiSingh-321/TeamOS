@@ -8,9 +8,9 @@ import { ProjectScope } from "@/components/intelligence/project-scope";
 import { intelligenceScope,riskSummary,type RiskRecord } from "@/lib/intelligence/queries";
 import { reviewRisk } from "@/lib/intelligence/actions";
 export const metadata={title:"Risk Center"};
-export default async function Page({searchParams}:{searchParams:Promise<{project?:string}>}){
- const scope=await intelligenceScope((await searchParams).project);const {db,project,active}=scope;
- const [result,summary,history]=project&&db&&active?await Promise.all([db.from("project_risks").select("*").eq("project_id",project.id).order("detected_at",{ascending:false}).limit(100),riskSummary(active.id,project.id),db.from("risk_history").select("risk_id,status,note,created_at").eq("workspace_id",active.id).order("created_at",{ascending:false}).limit(300)]):[null,null,null];
+export default async function Page({searchParams}:{searchParams:Promise<{project?:string;risk?:string}>}){
+ const params=await searchParams;const scope=await intelligenceScope(params.project);const {db,project,active}=scope;
+ const [result,summary,history]=project&&db&&active?await Promise.all([db.from("project_risks").select("*").eq("project_id",project.id).or(params.risk&&/^[0-9a-f-]{36}$/i.test(params.risk)?`id.eq.${params.risk}`:"id.not.is.null").order("detected_at",{ascending:false}).limit(100),riskSummary(active.id,project.id),db.from("risk_history").select("risk_id,status,note,created_at").eq("workspace_id",active.id).order("created_at",{ascending:false}).limit(300)]):[null,null,null];
  const evidence=active&&db?await db.from("risk_evidence").select("risk_id,event:project_risk_events!risk_evidence_event_id_fkey(evidence,kind,meeting_id,created_at)").eq("workspace_id",active.id).limit(300).overrideTypes<{risk_id:string;event:{evidence:string;kind:string;meeting_id:string|null;created_at:string}}[],{merge:false}>():null;
  const risks=(result?.data??[]) as RiskRecord[];const manager=["owner","admin"].includes(active?.role??"");
  return <div className="space-y-5"><PageHeading title="Risk Center" description="Explainable signals, real dependency impact, and human review."/><ProjectScope path="/risks" projects={scope.projects} selected={project?.id}/>{scope.error&&<p role="alert">{scope.error}</p>}{result?.error&&<p role="alert" className="text-sm text-destructive">Apply the Phase 8 migration or refresh to load risk data.</p>}

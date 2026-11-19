@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAuth } from "@/lib/auth/session";
@@ -84,8 +85,11 @@ export async function addTaskComment(_state: WorkspaceActionState, form: FormDat
   const supabase = await client();
   const input = commentInputSchema.safeParse(Object.fromEntries(form));
   if (!input.success) return { error: input.error.issues[0].message };
-  const { workspaceId, taskId, body } = input.data;
-  const { error } = await supabase.from("task_comments").insert({ workspace_id: workspaceId, task_id: taskId, body });
+  const { taskId, body } = input.data;
+  const mentions = z.array(z.uuid()).max(10).safeParse(form.getAll("mentions"));
+  const requestId = z.uuid().safeParse(form.get("requestId"));
+  if (!mentions.success || !requestId.success) return { error: "Choose up to ten valid members and retry." };
+  const { error } = await supabase.rpc("post_task_comment", { target_task: taskId, content: body, mentioned_users: mentions.data, request_id: requestId.data });
   if (error) return { error: "Could not post the comment. Check whether the task is still available." };
   revalidatePath("/my-tasks");
   revalidatePath("/dependencies");

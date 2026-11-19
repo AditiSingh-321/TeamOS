@@ -132,6 +132,7 @@ export function TaskBoard({ tasks, members, projects, workspace, userId, mine }:
             if (result.error) router.refresh();
           } catch {
             setNotice({ error: "Could not move the task. Try again." });
+            router.refresh();
           }
         });
       }}>

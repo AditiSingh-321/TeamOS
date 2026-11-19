@@ -1,13 +1,15 @@
 "use client";
 
-import { ClipboardCheck, CalendarDays, ShieldAlert, Bell, ClipboardList, FileText, FolderKanban, GitBranch, Layers3, LayoutGrid, Menu, Search, Settings, Sparkles, Users, X } from "lucide-react";
+import { Bell, ClipboardCheck, CalendarDays, ShieldAlert, ClipboardList, FileText, FolderKanban, GitBranch, Layers3, LayoutGrid, Menu, Search, Settings, Sparkles, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, type ReactNode } from "react";
 import { MemberAvatar } from "@/components/ui/member-avatar";
 import type { WorkspaceSummary } from "@/types/team";
 import { AccountMenu } from "@/components/auth/account-menu";
 import type { AuthProfile } from "@/types/auth";
+import { Notifications } from "@/components/collaboration/notifications";
+import { LiveSync } from "@/components/collaboration/live-sync";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -21,6 +23,7 @@ const navigation = [
   { href: "/risks", label: "Risk Center", icon: ShieldAlert },
   { href: "/meetings", label: "Meetings", icon: CalendarDays },
   { href: "/approvals", label: "Approval Center", icon: ClipboardCheck },
+  { href: "/notifications", label: "Notifications", icon: Bell },
 ];
 
 const upcoming = [
@@ -101,7 +104,8 @@ export function AppShell({ children, profile, workspace }: { children: ReactNode
           <div className="ml-auto flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground sm:h-auto sm:w-56 sm:justify-start sm:gap-2 sm:border sm:bg-background sm:px-3 sm:py-2 sm:text-xs">
             <Search size={15} aria-hidden="true" /><span className="sr-only sm:not-sr-only">Search workspace</span><span className="sr-only sm:not-sr-only sm:ml-auto sm:text-[10px]">Coming soon</span>
           </div>
-          <span role="img" aria-label="Notifications coming soon" title="Notifications coming soon" className="grid size-8 shrink-0 place-items-center text-muted-foreground sm:ml-2"><Bell size={17} aria-hidden="true" /></span>
+          <Suspense fallback={null}><LiveSync workspaceId={workspace?.id} userId={profile.id} /></Suspense>
+          <Notifications compact />
           <span className="h-6 border-l" aria-hidden="true" />
           <AccountMenu profile={profile} />
         </header>

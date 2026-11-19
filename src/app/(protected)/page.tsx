@@ -1,6 +1,7 @@
+import { ActivityFeed } from "@/components/collaboration/activity-feed";
 import Link from "next/link";
 import { ProjectHealth } from "@/components/intelligence/project-health";
-import { RecentActivity, RecentProjects, UpcomingTasks, WelcomeBanner } from "@/components/dashboard/dashboard-panels";
+import { RecentProjects, UpcomingTasks, WelcomeBanner } from "@/components/dashboard/dashboard-panels";
 import { WorkspaceStats } from "@/components/dashboard/workspace-stats";
 import { PageHeading } from "@/components/layout/page-heading";
 import { Card } from "@/components/ui/card";
@@ -34,7 +35,7 @@ export default async function DashboardPage() {
             {result && !result.error && <RecentProjects projects={result.projects} />}
             {taskData?.error ? <p role="alert" className="text-sm text-destructive">Could not load task data. Check that the Phase 4 migration is applied.</p> : <UpcomingTasks tasks={taskData?.upcoming ?? []} />}
           </div>
-          {result && !result.error && <RecentActivity projects={result.projects} />}
+          {result && !result.error && <ActivityFeed workspaceId={active.id} />}
         </>
       )}
     </div>

@@ -31,10 +31,10 @@ test("approval engine executes scoped handlers, detects stale writes, logs failu
   await t.test("member proposal needs manager approval; repeated concurrent requests create one task",async()=>{
    await asUser(db,member);const id=await propose({type:"CREATE_TASK",payload:{title:"Approved follow-up",description:"Contact provider",priority:"High",due_date:null,assignee_id:member}});
    await assert.rejects(rpc(db,"review_action_proposal",[id,1,"approve"]),/Manager/);
-   await asUser(db,owner);const results=await Promise.all([rpc(db,"review_action_proposal",[id,1,"approve"]),rpc(db,"review_action_proposal",[id,1,"approve"])]);
+   await asUser(db,owner);assert.equal((await db.query("select * from public.notifications where type='approval_pending'")).rows.length,1);const results=await Promise.all([rpc(db,"review_action_proposal",[id,1,"approve"]),rpc(db,"review_action_proposal",[id,1,"approve"])]);
    assert(results.every(result=>result.status==="executed"));assert.equal((await db.query("select count(*)::int as n from public.tasks where title='Approved follow-up'")).rows[0].n,1);
    assert.equal((await db.query("select count(*)::int as n from public.action_execution_logs where proposal_id=$1 and outcome='executed'",[id])).rows[0].n,1);
-   await asUser(db,outsider);assert.equal((await db.query("select * from public.action_proposals")).rows.length,0);await assert.rejects(rpc(db,"review_action_proposal",[id,1,"approve"]),/Manager/);await asUser(db,owner);
+   await asUser(db,member);assert.equal((await db.query("select * from public.notifications where type='action_executed'")).rows.length,1);await asUser(db,outsider);assert.equal((await db.query("select * from public.action_proposals")).rows.length,0);await assert.rejects(rpc(db,"review_action_proposal",[id,1,"approve"]),/Manager/);await asUser(db,owner);
   });
   await t.test("status, priority, due date, assignment and comment handlers update existing task data",async()=>{
    await resetBudget();
@@ -61,11 +61,11 @@ test("approval engine executes scoped handlers, detects stale writes, logs failu
   });
   await t.test("blocker comment -> risk -> follow-up -> approval creates one task and retains evidence",async()=>{
    await resetBudget();const body="Payment integration is blocked because vendor credentials are missing.";
-   const payment=(await db.query("insert into public.tasks(workspace_id,project_id,title) values($1,$2,'Payment integration') returning id",[wid,pid])).rows[0].id;
+   const payment=(await db.query("insert into public.tasks(workspace_id,project_id,title,assignee_id) values($1,$2,'Payment integration',$3) returning id",[wid,pid,member])).rows[0].id;
    await rpc(db,"add_task_dependency",[wid,pid,payment,tid]);await db.query("insert into public.task_comments(workspace_id,task_id,body) values($1,$2,$3)",[wid,payment,body]);
    await asWorker(db);
    for(let i=0;i<20;i++){const record=await rpc(db,"claim_intelligence_job");if(!record)break;const result=await analyzeRiskEvent(record.event,record.context,async()=>({state:"confirmed",blockerType:"external_dependency",reason:"Missing credentials",evidence:body,reportedDelayDays:null,confidence:0.9,suggestedActions:["Contact the provider"]}),new Date().toISOString().slice(0,10));await rpc(db,"finish_risk_job",[record.job.id,record.job.lease_token,record.context,result.result,result.impacts]);}
-   await asUser(db,owner);const risk=(await db.query("select * from public.project_risks where source_task_id=$1",[payment])).rows[0];assert(risk);assert(risk.affected_task_ids.includes(tid));
+   await asUser(db,owner);const risk=(await db.query("select * from public.project_risks where source_task_id=$1",[payment])).rows[0];assert(risk);assert(risk.affected_task_ids.includes(tid));await asUser(db,member);assert.equal((await db.query("select * from public.notifications where type='risk'")).rows.length,1);await asUser(db,owner);
    const id=await rpc(db,"propose_risk_followup",[risk.id]);assert.equal(await rpc(db,"propose_risk_followup",[risk.id]),id);const result=await rpc(db,"review_action_proposal",[id,1,"approve"]);assert.equal(result.status,"executed");assert.equal(await rpc(db,"propose_risk_followup",[risk.id]),id);
    assert.equal((await db.query("select source_snapshot->'evidence'->>'text' as text from public.action_proposals where id=$1",[id])).rows[0].text,body);
    assert.equal((await db.query("select status from public.tasks where id=$1",[result.result.task_id])).rows[0].status,"To Do");
@@ -75,7 +75,7 @@ test("approval engine executes scoped handlers, detects stale writes, logs failu
    await db.exec("reset role;update private.intelligence_jobs set state='done' where kind='risk_event' and state='queued'");await asWorker(db);const record=await rpc(db,"claim_intelligence_job");assert.equal(record.job.kind,"meeting_analysis");
    const draft=prepareMeetingAnalysis(analysis,notes,["Rahul"],[],[{user_id:member,display_name:"Rahul"}]);draft.blockers=[];draft.taskUpdates=[];await rpc(db,"finish_meeting_analysis",[record.job.id,record.job.lease_token,draft]);await asUser(db,owner);await rpc(db,"save_reviewed_meeting",[aid,2,draft]);
    const ids=await rpc(db,"propose_meeting_actions",[aid,3]);assert.equal(ids.length,1);assert.deepEqual(await rpc(db,"propose_meeting_actions",[aid,3]),ids);
-   const result=await rpc(db,"review_action_proposal",[ids[0],1,"approve"]);assert.equal(result.status,"executed");assert.equal((await db.query("select count(*)::int as n from public.tasks where title='Contact payment provider'")).rows[0].n,1);assert.deepEqual(await rpc(db,"propose_meeting_actions",[aid,3]),ids);
+   const result=await rpc(db,"review_action_proposal",[ids[0],1,"approve"]);assert.equal(result.status,"executed");await asUser(db,member);assert.equal((await db.query("select * from public.notifications where type='meeting_action'")).rows.length,1);await asUser(db,owner);assert.equal((await db.query("select count(*)::int as n from public.tasks where title='Contact payment provider'")).rows[0].n,1);assert.deepEqual(await rpc(db,"propose_meeting_actions",[aid,3]),ids);
    const edited={...draft,actionItems:[{...draft.actionItems[0],title:"Second meeting action",evidence:"We decided to use PostgreSQL."}]};await rpc(db,"save_reviewed_meeting",[aid,3,edited]);const pending=(await rpc(db,"propose_meeting_actions",[aid,4]))[0];
    await rpc(db,"save_meeting",[pid,mid,1,{title:"Changed",meeting_date:"2026-11-18",participants:[],transcript:notes+" Additional notes."}]);assert.equal((await rpc(db,"review_action_proposal",[pending,1,"approve"])).status,"failed");
   });

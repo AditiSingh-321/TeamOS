@@ -18,6 +18,7 @@ export interface Task {
 }
 
 export interface TaskComment {
+  mentions?: { user_id:string }[];
   id: string;
   author_id: string | null;
   body: string;

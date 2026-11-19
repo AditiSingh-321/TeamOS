@@ -9,11 +9,13 @@ import { structuredResponse } from "../src/lib/knowledge/provider.ts";
 const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.SUPABASE_SERVICE_ROLE_KEY;
 if(!url||!key||key==="replace_me"){console.error("Configure the server-only Supabase worker credential.");process.exit(1);}
 const db=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
+const reminderDays=Number(process.env.NOTIFICATION_DUE_SOON_DAYS??1);
+if(!Number.isInteger(reminderDays)||reminderDays<0||reminderDays>14){console.error("NOTIFICATION_DUE_SOON_DAYS must be an integer from 0 to 14.");process.exit(1);}
 const once=process.argv.includes("--once");let stopping=false;let scanned=0;
 process.on("SIGINT",()=>{stopping=true;});process.on("SIGTERM",()=>{stopping=true;});
 async function rpc(name,args={}){const {data,error}=await db.rpc(name,args);if(error)throw new Error("Intelligence queue request failed.");return data;}
 async function run(){
- if(Date.now()-scanned>60000){await rpc("scan_overdue_risks");scanned=Date.now();}
+ if(Date.now()-scanned>60000){await rpc("scan_overdue_risks");await rpc("scan_task_reminders",{due_window_days:reminderDays});scanned=Date.now();}
  const record=await rpc("claim_intelligence_job");if(!record)return false;
  const {job,event,context}=record;const args={job_id:job.id,token:job.lease_token};
  try{

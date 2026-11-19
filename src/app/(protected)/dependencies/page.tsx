@@ -1,3 +1,4 @@
+import { ProjectPresence } from "@/components/collaboration/project-presence";
 import { riskSummary } from "@/lib/intelligence/queries";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -52,6 +53,7 @@ export default async function DependenciesPage({ searchParams }: {
           {!project && board.projects.length > 0 && <p className="text-sm text-muted-foreground">{params.project ? "This project is unavailable in the active workspace." : "Choose a project to view its graph."}</p>}
         </>
       )}
+      {active && project && <ProjectPresence workspaceId={active.id} projectId={project.id} />}
       {graphError && <p role="alert" className="text-sm text-destructive">{graphError}</p>}
       {active && project && graph && !graphError && (
         tasks.length ? <DependencyGraph key={JSON.stringify([project.id, tasks, graph.edges])} tasks={tasks} edges={graph.edges} riskSources={risks?.sources??[]} riskAffected={risks?.affected_ids??[]} workspace={active} projectId={project.id} userId={profile.id} />

@@ -1,8 +1,10 @@
+import { randomUUID } from "node:crypto";
+import { CommentForm } from "@/components/collaboration/comment-form";
 import { TaskRisks } from "@/components/intelligence/task-risks";
 import { Card } from "@/components/ui/card";
 import { WorkspaceForm } from "@/components/workspaces/workspace-form";
 import { fieldClass } from "@/components/workspaces/styles";
-import { addTaskComment, changeTaskStatus, deleteTask, saveTask } from "@/lib/tasks/actions";
+import { changeTaskStatus, deleteTask, saveTask } from "@/lib/tasks/actions";
 import { canEditTask, canMoveTask } from "@/lib/tasks/permissions";
 import { formatDate } from "@/lib/workspace";
 import { taskPriorities, taskStatuses, type Task, type TaskComment, type TaskProject } from "@/types/task";
@@ -116,18 +118,13 @@ export function TaskDetails({ workspace, members, projects, task, userId, commen
                     <time dateTime={comment.created_at} className="text-xs text-muted-foreground">{formatDate(comment.created_at)}</time>
                   </div>
                   <p className="whitespace-pre-wrap break-words text-sm">{comment.body}</p>
+                  {comment.mentions?.length ? <p className="text-xs text-primary">Mentioned: {comment.mentions.map(m=>people.get(m.user_id)??"Former member").join(", ")}</p> : null}
                 </li>
               ))}
             </ol>
           ) : <p className="text-sm text-muted-foreground">No comments yet.</p>
         )}
-        <WorkspaceForm action={addTaskComment} label="Post comment">
-          <input type="hidden" name="workspaceId" value={workspace.id} />
-          <input type="hidden" name="taskId" value={task.id} />
-          <label className="grid gap-1 text-sm font-medium">Comment
-            <textarea name="body" rows={3} required maxLength={2000} className={fieldClass} />
-          </label>
-        </WorkspaceForm>
+        <CommentForm workspaceId={workspace.id} taskId={task.id} members={members} requestId={randomUUID()} />
       </Card>
       {editable && (
         <Card className="space-y-3 border-rose-200 p-4">

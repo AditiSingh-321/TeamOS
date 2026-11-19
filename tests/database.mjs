@@ -9,6 +9,13 @@ export async function createDatabase({ beforeSarvam = false } = {}) {
     create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz,raw_user_meta_data jsonb);
     create function auth.uid() returns uuid language sql stable as
     'select (nullif(current_setting(''request.jwt.claims'',true),'''')::jsonb ->> ''sub'')::uuid';
+    create schema realtime;
+    create table realtime.messages(id uuid default gen_random_uuid(),extension text,topic text);
+    alter table realtime.messages enable row level security;
+    create function realtime.topic() returns text language sql stable as
+      'select current_setting(''realtime.topic'',true)';
+    grant usage on schema realtime to authenticated;
+    grant select,insert on realtime.messages to authenticated;
     create schema storage;
     create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
     create table storage.objects(id uuid default gen_random_uuid() primary key,bucket_id text,name text,unique(bucket_id,name));

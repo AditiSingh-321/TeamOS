@@ -1,0 +1,4 @@
+import { z } from "zod";
+import { projectContext,httpError } from "@/lib/knowledge/http";
+import { checkDatabase,json } from "@/lib/collaboration/server";
+export async function GET(request:Request,{params}:{params:Promise<{id:string}>}){try{const {id}=await params;const {supabase}=await projectContext(id);const input=z.object({page:z.coerce.number().int().min(1).max(10000).default(1),type:z.string().regex(/^[a-z_]{1,40}$/).optional()}).parse(Object.fromEntries(new URL(request.url).searchParams));let q=supabase.from("project_activity_events").select("id,actor_name,event_type,target_type,target_id,summary,created_at",{count:"exact"}).eq("project_id",id);if(input.type)q=q.eq("event_type",input.type);const {data,error,count}=await q.order("created_at",{ascending:false}).order("id",{ascending:false}).range((input.page-1)*25,input.page*25-1);checkDatabase(error);return json({rows:data??[],count:count??0,page:input.page});}catch(e){return httpError(e);}}

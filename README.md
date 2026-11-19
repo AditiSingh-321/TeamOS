@@ -314,3 +314,94 @@ Intelligence jobs use PostgreSQL row locks, lease tokens, five-minute leases, th
 Automated checks: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm eval:rag`, `pnpm build`. Tests mock external AI services and use actual PostgreSQL/pgvector in PGlite. The approval suite issues concurrent RPC promises and verifies one mutation/log; PGlite serializes connection queries, so a separate live two-session PostgreSQL load test is still advisable before a high-concurrency production launch. SQL project/proposal row locks provide the server-side concurrency boundary. No live AI benchmark is claimed.
 
 Known limits: indexing/risk UI is eventually consistent with the worker; risk cards show the latest 100 records and meeting/proposal lists are bounded. Natural action planning accepts up to 200 task candidates unless a task is selected explicitly. There is no duration/slack model, audio transcription, autonomous execution, or external tool integration. A verified quotation cannot prove a model's semantic interpretation, so source review remains necessary. Audit logs are protected from application edits/deletes but live within their project's retention lifecycle. Hosted migrations and the worker credential must be configured before cloud end-to-end use. Phase 11 is not implemented.
+
+
+## Phase 11: realtime collaboration and in-app notifications
+
+Phase 11 extends the existing Kanban, task details, dashboard, dependency graph, Risk Center, Meetings, and Approval Center. No new packages, AI services, infrastructure, or global state library are introduced. All mutations still go through the existing authorized server actions/RPCs; Realtime callbacks never execute task changes or AI analysis.
+
+### Architecture and subscription model
+
+```mermaid
+flowchart LR
+  Mutation[Authorized task / meeting / risk / approval mutation] --> Transaction[PostgreSQL transaction]
+  Transaction --> Business[Existing business tables and audit logs]
+  Transaction --> Activity[Project activity event]
+  Activity --> Notification[Validated recipients + preferences + durable notifications]
+  Transaction --> Signal[Small per-scope invalidation row]
+  Notification --> Signal
+  Signal --> Realtime[Supabase Postgres Changes with SELECT RLS]
+  Realtime --> Debounce[Deduplicate and batch signals for 350 ms]
+  Debounce --> Fetch[Refetch authorized server data]
+  Fetch --> UI[Existing views and live notification badge]
+```
+
+`public.collaboration_signals` has one row per workspace (`w:UUID`), project (`p:UUID`), or recipient (`u:UUID`). An update changes an opaque event UUID. Only this small table is added to `supabase_realtime`; task descriptions, comments, transcripts, proposal payloads, and notification contents are **not** replicated. Business-row deletion generates a normal signal rather than relying on Postgres DELETE payload authorization. A read-only authorized private `sync:w:UUID`, `sync:p:UUID`, or `sync:u:UUID` channel carries the Postgres Changes subscriptions; a SELECT-only join policy allows this on private-only Supabase tenants without granting client Broadcast publication. Each view subscribes to the current user plus the selected project, or its active workspace for workspace-wide/default-project views. It never subscribes to every table or every workspace.
+
+The server remains authoritative. A repeated or out-of-order signal causes at most a batched refetch, not a row patch. Existing task `updated_at` compare-and-swap checks and approval revision checks remain intact. Failed Kanban moves roll back optimistic state and refresh confirmed values. Notification reads use request sequencing so a slower previous request cannot replace a newer page. Realtime subscriptions are removed on unmount/project/workspace changes. Visibility and online events revalidate; a 15-second authenticated check catches missed events, expired sessions, account changes, and revoked membership. Channel failures retry, and unavailable transport falls back to these version checks. This is not offline-first: displayed data is preserved while disconnected and failed writes must be retried explicitly.
+
+The original HTTP-only auth cookies are preserved. `/api/collaboration/session` first authenticates with `getUser`, validates membership/project scope, and returns only authorized signal versions. When requested, it returns the existing user access token with `private, no-store` headers for `realtime.setAuth`. The browser keeps this token only in memory using a non-persistent Supabase client; no refresh token, service credential, or API key is returned. Token lifetime follows your Supabase Auth configuration. Session refresh uses the existing cookie/proxy flow.
+
+### Notifications and activity
+
+- `project_activity_events` stores actor, scope, resource reference, concise summary, relevant status metadata, stable source key, and timestamp. Existing risk history and action execution logs are preserved. Triggers generate activity in the same transaction as business operations; rollback also removes the event/notifications. Events cover task CRUD/status/assignment/comments, dependencies, documents, meetings/analyses, risks, and proposal states. Historical activity before migration is not fabricated or backfilled.
+- `notifications` stores a recipient, event FK, type, title/body, authorized target reference, timestamp, and nullable `read_at`. Uniqueness on recipient/event/type prevents duplicate delivery. Only recipients with current workspace membership can read their own records. Clients cannot insert/edit/delete notification content. Restricted RPCs update read state.
+- Assignment alerts go to the new assignee. Mentions go only to explicitly selected, validated workspace members, never arbitrary @text. The comment RPC uses a per-author request UUID to make a retried submission idempotent. Up to ten members may be mentioned.
+- Risk alerts go to workspace owners/admins and the source-task assignee, rather than all members. Approval requests go to managers. Executed-action notifications go to the requester and affected assignee, deduplicated when these are the same person. Approved meeting work uses the meeting-action type. Unapproved meeting suggestions do not notify assignees as confirmed work. Self-notifications are suppressed.
+- `notification_preferences` controls assignments, mentions, reminders, risk alerts, approvals/execution, and meeting work. Preferences apply to future notifications, not historical entries. There are no external email/SMS/push deliveries.
+- The bell shows recent items and unread count; `/notifications` offers All/Unread, mark-one/all-read, 20-item pages, preferences, error/empty/loading states. Opening an item calls a same-origin POST that rechecks live resource access, switches the active workspace securely, and returns an allowlisted internal destination. Deleted or inaccessible resources return an unavailable message rather than opening private data.
+- Project cards link to `/projects/[projectId]`, with a 25-event paginated activity feed and event-type filter. The dashboard shows the latest 25 authorized workspace events. New changes refresh both views automatically. Dashboard counts use real database records, including overdue tasks and pending approvals.
+
+### Due-date reminders and worker
+
+The existing intelligence worker also runs `scan_task_reminders` once per minute in batches of at most 100, using row locks and stable keys based on task, assignee, due date, and reminder type. It excludes Done/unassigned tasks. `NOTIFICATION_DUE_SOON_DAYS=1` means a task due today or tomorrow in the **UTC calendar** is due soon; overdue means before today. Valid windows are 0–14 days. There is one due-soon and one overdue reminder per task/assignee/due date, not daily repeated overdue notifications. Preferences are checked when the reminder is recorded. Run more scans to drain a backlog; no delivery latency/scalability benchmark is claimed.
+
+```powershell
+pnpm dev
+# In another terminal (restart after applying Phase 11):
+pnpm worker:intelligence
+# Existing document ingestion remains separate:
+pnpm worker:documents
+```
+
+### Presence and revocation
+
+Project overview and Dependencies use private Supabase Presence channels named `project:UUID`. The migration adds SELECT/INSERT policies restricted to the `presence` extension and current workspace membership. It adds no client Broadcast publication policy. Presence sends only a user-ID key and a connection boolean, not names, email, task content, or transcripts. Names/avatars resolve through a fresh authorized roster; multiple tabs with the same key display once. Presence is advisory client-reported connection information, not proof of activity, identity, attendance, or permission.
+
+Presence joins are reauthorized and rotated every 30 seconds; leave/untrack runs on cleanup. Supabase caches private-channel authorization for open connections, so **immediate forced termination of a hostile already-connected Presence client is not guaranteed**. Such a client could retain minimal presence-ID metadata until transport/token reauthorization. Normal clients clear/leave on failed authorization; project data/notifications remain protected independently by SELECT RLS and fresh server checks. Do not add private content to Presence payloads. See [Supabase Realtime authorization](https://supabase.com/docs/guides/realtime/authorization) and [Postgres Changes security](https://supabase.com/docs/guides/realtime/postgres-changes).
+
+### Required Supabase activation
+
+1. Apply `supabase/migrations/20261119000000_realtime_collaboration.sql` **after all Phase 1–10 migrations**, once, in Supabase SQL Editor. This migration has been tested in an isolated PostgreSQL/PGlite database; it is not automatically applied to your hosted project.
+2. In **Database → Replication** (or Publications in your dashboard version), inspect `supabase_realtime` and ensure `public.collaboration_signals` is included. The migration adds it when that publication exists. If absent, run `create publication supabase_realtime for table public.collaboration_signals;`. Do not enable replication on all business tables for this implementation.
+3. In **Realtime → Settings**, disable **Allow public access** to enforce private Broadcast/Presence channels. Postgres Changes authorization remains table RLS. Review existing `realtime.messages` policies: an old permissive allow-all policy can widen access because PostgreSQL permissive policies combine with OR. Keep the `teamos_sync_join` and two `teamos_presence_*` policies and do not add general client Broadcast grants. The migration installs Presence policies when Supabase's `realtime.messages` exists; the local test fixture supplies a policy-test stub, not a WebSocket server.
+4. Check authenticated users can SELECT `collaboration_signals`, and only the intended tables/policies are enabled. No service-role key belongs in client code. Existing `.env.local` Supabase/Sarvam settings remain valid. The only new optional environment variable is `NOTIFICATION_DUE_SOON_DAYS` in `.env.example`.
+5. Restart the app/intelligence worker. With the migration applied, notifications and activity load. Without it, the UI gives an actionable Phase 11 setup error and preserves existing mutation authorization.
+
+### API endpoints
+
+- `GET /api/collaboration/session?workspace=UUID&project=UUID`: authorized scope/version checks; `token=1` supplies the in-memory Realtime token; `presence=1` requests the authorized roster.
+- `GET /api/notifications?page=1&unread=0`: current-user 20-item page.
+- `GET /api/notifications/unread-count`.
+- `PATCH /api/notifications/[id]/read`.
+- `POST /api/notifications/mark-all-read`.
+- `POST /api/notifications/[id]/open`: reauthorize target, mark read, securely select workspace.
+- `GET/PATCH /api/notifications/preferences`.
+- `GET /api/projects/[id]/activity?page=1&type=task_created`: authorized 25-item project page.
+
+Mutations verify same origin; schemas validate IDs, page limits, preferences and mentions. Activity/notification creation helpers, reminder scans, signal writes, and audit history are not writable by untrusted clients. Removed members immediately lose database read authorization even if they know old IDs/channel names. A transport signal contains only opaque identifiers; every displayed update is independently fetched with current permissions.
+
+### Testing with two accounts
+
+1. Use two separate browser profiles (or one normal and one private window). Sign in as two existing members of the same workspace, with at least one manager. Open the same project via its card; both viewers should appear after Presence connects.
+2. Open My Tasks in both. Create a task, assign it to the other account, and move its status. Check the second board, details, counts, bell, and activity update automatically. Open the notification to verify the exact task/workspace.
+3. Open that task in both sessions. Post a comment with an explicitly selected mention. Check one comment, author/time, a single mention notification, and unread count. Mark it read, then verify the bell/count follows. Disable mentions in preferences and post a new mention to verify suppression.
+4. Trigger a blocker risk using the existing intelligence worker; inspect the Risk Center, graph highlighting, and relevant recipient notification. Create/approve a proposal and verify the real task, activity, requester/assignee notifications, and second client's board. Reviewed meeting proposals notify assigned users only after execution.
+5. Temporarily disconnect one browser, change a task in the other, reconnect, and verify authoritative reconciliation without duplicates. Edit the same task from both to confirm stale writes fail instead of overwriting.
+6. Use an outsider account to request the project/activity/notification APIs and verify denial/empty RLS results. Remove a disposable test member and verify its former project/notification views disappear on the next authenticated check. Perform destructive testing only with disposable test records.
+
+Automated commands: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, and the existing `pnpm eval:rag`. Collaboration tests use real PostgreSQL constraints, triggers, RLS, transactions, reminders and pagination in PGlite. Tests simulate duplicate/out-of-order invalidations and reconnect, and assert risk/approval/meeting notification integration with mocked AI. The optional live suite described below is separate: PGlite cannot validate Supabase WebSocket delivery, Presence transport caching, replication configuration, or multi-session latency. No hosted two-browser test is claimed without that setup.
+
+Optional live transport test: provision two isolated accounts and an existing disposable project whose name starts `TEST Realtime`. Configure `TEAMOS_REALTIME_TEST=1`, `REALTIME_TEST_PROJECT_ID`, `REALTIME_TEST_USER_A_EMAIL`, `REALTIME_TEST_USER_A_PASSWORD`, `REALTIME_TEST_USER_B_EMAIL`, and `REALTIME_TEST_USER_B_PASSWORD` in the shell (never commit these values). Account A must be a project-workspace manager; B must be a member. With Phase 11 migration/publication configured, run `node --env-file=.env.local --experimental-strip-types --import ./tests/register.mjs --test tests/realtime-live.test.mjs`. It creates/deletes only its uniquely named test task and leaves project/accounts intact. Without opt-in credentials the test is explicitly skipped.
+
+Known limits: activity/notifications follow their workspace/project retention lifecycle; no archival job is added. Notification pages use bounded offset pagination and may shift under concurrent inserts; reload/page navigation always reads current state. Server-rendered views refetch in batches rather than applying row diffs; busy workspaces can still trigger server queries. Presence roster display is capped at 1,000 members and is advisory; reconnecting may briefly flicker. No offline write queue, external notifications, chat, autonomous actions, or Phase 12 features are introduced.

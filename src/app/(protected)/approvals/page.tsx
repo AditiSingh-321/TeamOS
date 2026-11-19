@@ -5,9 +5,10 @@ import { ProposalCard,type ProposalInfo } from "@/components/intelligence/propos
 import { Card } from "@/components/ui/card";
 import { intelligenceScope } from "@/lib/intelligence/queries";
 export const metadata={title:"Approval Center"};
-export default async function Page({searchParams}:{searchParams:Promise<{project?:string;status?:string}>}){
+export default async function Page({searchParams}:{searchParams:Promise<{project?:string;status?:string;proposal?:string}>}){
  const params=await searchParams;const scope=await intelligenceScope(params.project);const {db,project,active}=scope;const statuses=["all","pending","approved","executed","rejected","failed","cancelled"];const status=statuses.includes(params.status??"")?params.status!:"pending";
  let query=project&&db?db.from("action_proposals").select("*").eq("project_id",project.id).order("created_at",{ascending:false}).limit(100):null;if(status!=="all")query=query?.eq("status",status)??null;
+ if(params.proposal&&/^[0-9a-f-]{36}$/i.test(params.proposal))query=query?.eq("id",params.proposal)??null;
  const [proposals,tasks,members]=project&&db&&active?await Promise.all([query,db.from("tasks").select("id,title").eq("project_id",project.id).order("title").limit(1000),db.from("workspace_members").select("user_id,display_name").eq("workspace_id",active.id)]):[null,null,null];
  const rows=(proposals?.data??[]) as ProposalInfo[];const ids=rows.map(row=>row.id);const logs=db&&ids.length?await db.from("action_execution_logs").select("proposal_id,outcome,created_at,error_message").in("proposal_id",ids).order("created_at").limit(1000):null;
  return <div className="space-y-5"><PageHeading title="Approval Center" description="Review proposed changes before they can affect your project."/><ProjectScope path="/approvals" projects={scope.projects} selected={project?.id}/>{scope.error&&<p role="alert">{scope.error}</p>}{proposals?.error?<p role="alert" className="text-sm text-destructive">Apply the Phase 10 migration to enable approvals.</p>:project&&<ActionRequest projectId={project.id} tasks={tasks?.data??[]} members={members?.data??[]}/>}
